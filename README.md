@@ -10,14 +10,16 @@ Built as a retrieval and evaluation exercise. The golf is the domain; the intere
 
 Retrieval, 59 answerable and 8 non-fault queries, 95% bootstrap confidence intervals over 10,000 resamples:
 
-| Metric | Score | 95% CI |
-|---|---|---|
-| hit@5 | 0.949 | 0.881 to 1.000 |
-| hit@1 | 0.729 | 0.610 to 0.831 |
-| recall@5 | 0.910 | 0.842 to 0.966 |
-| MRR | 0.823 | 0.742 to 0.898 |
-| NDCG@5 | 0.837 | 0.759 to 0.904 |
-| Abstention | 1.000 | 8 of 8, zero false declines |
+| Metric | Score | 95% CI | What it means |
+|---|---|---|---|
+| hit@5 | 0.966 | 0.915 to 1.000 | Correct entry in the top five results |
+| hit@1 | 0.729 | 0.610 to 0.831 | Correct entry ranked first |
+| recall@5 | 0.927 | 0.864 to 0.975 | Share of relevant entries found |
+| MRR | 0.827 | 0.746 to 0.898 | How high the first correct hit lands |
+| NDCG@5 | 0.844 | 0.771 to 0.908 | Rank-weighted quality |
+| Abstention | 1.000 | | 8 of 8, zero false declines |
+
+**hit@5 and hit@1 are different claims.** hit@5 of 0.966 means the correct entry appeared somewhere in the top five, not that the tool gave the right answer. The number for ranking it first is hit@1 at 0.729. MRR of 0.827 sitting close to hit@1 means that when the right entry is not first it is almost always second.
 
 Generation, final run: 59 answered, 8 of 8 correct refusals, 0 false refusals, 0 validation failures.
 
@@ -45,7 +47,7 @@ Refusal is decided in code before the model is called. A model handed a question
 
 **BM25 alone beat dense embeddings**, 0.93 against 0.90 at k=5, winning on every subset. Expected for a small corpus of terminology-dense documents, where rare terms carry most of the signal and there are few enough documents for IDF statistics to be meaningful. Two queries failed dense retrieval in every run despite containing the target entry's own distinctive vocabulary.
 
-**Hybrid fusion fixed four queries and broke none**, reaching 0.95 at k=5.
+**Hybrid fusion fixed four queries and broke none**, reaching 0.95 at k=5. A subsequent corpus fix, adding missing plain-language phrasings to one entry, took it to 0.966.
 
 **The confidence threshold was doing pure harm.** Swept every value from 0.20 to 0.60. Missed refusals were zero at every threshold, because the out-of-scope entries catch everything on their own. At 0.40 the threshold's only measured effect was refusing three legitimate questions. Set to 0.35, below the lowest genuine query at 0.388.
 
@@ -85,6 +87,20 @@ python tune_threshold.py --corpus golf-fault-corpus-v3.md golf-out-of-scope-entr
 
 The eval runs in CI on every push touching the corpus, the eval set or the retrieval code, and fails the build if recall@5 drops below 0.90.
 
+## Automation
+
+The eval runs in two places, which gives a direct comparison between the two tools.
+
+**GitHub Actions.** Runs on every push touching the corpus, the eval set or the retrieval code. Fails the build if recall@5 drops below 0.90.
+
+**n8n, self-hosted.** Polls for corpus changes, triggers a re-evaluation, compares against the previous run, and routes to one of three notifications depending on whether it passed, failed the gate, or regressed.
+
+![n8n workflow](docs/workflow.png)
+
+Workflow export: [`n8n-workflow.json`](n8n-workflow.json). Full specification: [`n8n-pipelines.md`](n8n-pipelines.md).
+
+**One architecture note.** The n8n Docker image has no Python, so running the eval through the Execute Command node was not possible. Rather than building a custom image, the Python is exposed as a local FastAPI service (`eval_service.py`) that n8n calls over HTTP. That keeps n8n orchestrating rather than shelling out, and keeps the retrieval work in Python.
+
 ## Files
 
 | File | What it is |
@@ -101,6 +117,8 @@ The eval runs in CI on every push touching the corpus, the eval set or the retri
 | `golf-shot-log-schema-v2.md` | Data model for the logging layer |
 | `golf-club-table-and-picker.md` | Club baselines and the outcome picker UI contract |
 | `n8n-pipelines.md` | Ingestion and quality-gate pipeline specification |
+| `n8n-workflow.json` | The n8n workflow, importable |
+| `eval_service.py` | FastAPI service n8n calls to run the eval |
 
 ## Scope
 

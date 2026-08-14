@@ -1051,3 +1051,4 @@ A hero recovery that comes off was still a bad bet. If the tool learns from outc
 - Mental and pressure effects, which are real but sit outside what this corpus should try to diagnose
 
 Add these once v1 is retrieving well. Do not expand the corpus before measuring it, or you will not know which changes helped.
+
