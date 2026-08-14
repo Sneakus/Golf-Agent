@@ -14,118 +14,121 @@ The corpus is the part of this system most likely to change and most likely to b
 
 This workflow makes that impossible to forget: any corpus change triggers a full re-embed and re-evaluation, the result is compared against the last recorded score, and a regression is reported rather than merged.
 
-It is also the honest answer to "what did you build on n8n": an ingestion and quality-gate pipeline, not a weather cron.
+## Architecture note, and why it changed
+
+The original plan used the Execute Command node to run the Python directly. That does not work: the n8n Docker image has no Python installed, which the container log states on startup.
+
+Two options were available. Build a custom image with Python added, or run the Python as a local HTTP service and have n8n call it. The service won, for reasons worth being able to explain:
+
+- n8n orchestrates rather than shells out, which is what it is actually good at
+- HTTP Request nodes are a far more transferable skill than Execute Command
+- The retrieval work stays in Python where it belongs
+- No custom image to maintain, so anyone can run the workflow against any host
+
+This is the same division the architecture already follows: n8n schedules, branches, notifies and handles errors; Python does the retrieval and evaluation.
+
+## Prerequisite: start the service
+
+```
+pip install fastapi uvicorn
+python eval_service.py
+```
+
+Runs on port 8000. From inside the n8n container, `localhost` means the container, so the host is reached at `host.docker.internal`.
+
+Endpoints:
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/health` | Service up |
+| GET | `/corpus/hash` | Current hash and whether it changed since the last eval |
+| POST | `/eval` | Runs the eval, returns metrics, deltas, and a pass or fail verdict |
+| POST | `/diagnose` | Answers one golfer query |
 
 ## Nodes
 
 **1. Schedule Trigger**
 - Interval: every 15 minutes
-- Alternative: Webhook node receiving a GitHub push event, if the repo is remote. The schedule version works entirely locally and needs no public URL.
 
-**2. Execute Command: hash the corpus**
+**2. HTTP Request: check for a corpus change**
+- Method: GET
+- URL: `http://host.docker.internal:8000/corpus/hash`
+
+**3. IF: has the corpus changed**
+- Condition: `{{ $json.changed }}` is true
+- False branch: end, nothing to do
+
+**4. HTTP Request: run the eval**
+- Method: POST
+- URL: `http://host.docker.internal:8000/eval`
+- Body, JSON:
+```json
+{
+  "label": "n8n scheduled run",
+  "threshold": 0.90
+}
 ```
-python -c "import hashlib,glob,json,sys; h=hashlib.sha256(); [h.update(open(f,'rb').read()) for f in sorted(glob.glob('D:/golf-tool/*.md'))]; print(json.dumps({'hash':h.hexdigest()}))"
-```
-- Working directory: `D:/golf-tool`
+- Timeout: 600000 ms, since embedding the corpus takes a moment
+- Response: JSON
 
-**3. Code node: parse the hash**
-```javascript
-const out = JSON.parse($input.first().json.stdout);
-return [{ json: { hash: out.hash } }];
-```
-
-**4. Read/Write Files from Disk: read last hash**
-- Operation: Read
-- File path: `D:/golf-tool/.n8n-state/last_hash.json`
-- On error: continue, so the first run works with no state file
-
-**5. IF: has the corpus changed**
-- Condition: `{{ $json.hash }}` not equal to `{{ $('Read last hash').item.json.hash }}`
-- False branch: end. Nothing to do.
-
-**6. Execute Command: run the evaluation**
-```
-python evaluate.py --corpus golf-fault-corpus-v3.md golf-out-of-scope-entries.md --evals golf-eval-sets-v2.md --label "n8n auto-run" --fail-under-recall5 0.90
-```
-- Working directory: `D:/golf-tool`
-- Always output data: on, so a non-zero exit still flows through rather than killing the run
-
-**7. Read/Write Files from Disk: read the summary**
-- Operation: Read
-- File path: `D:/golf-tool/eval_summary.json`
-
-**8. Code node: compare against the previous run**
-```javascript
-const now = JSON.parse($input.first().json.data.toString());
-let prev = null;
-try {
-  prev = JSON.parse($('Read previous summary').item.json.data.toString());
-} catch (e) { /* first run */ }
-
-const delta = (metric) => {
-  if (!prev) return null;
-  return +(now[metric].score - prev[metric].score).toFixed(3);
-};
-
-const regressed = prev
-  ? now['recall@5'].score < prev['recall@5'].score - 0.02
-  : false;
-
-return [{ json: {
-  recall5: now['recall@5'].score,
-  hit5: now['hit@5'].score,
-  hit1: now['hit@1'].score,
-  mrr: now.mrr.score,
-  abstention: now.abstention.score,
-  false_declines: now.false_declines,
-  delta_recall5: delta('recall@5'),
-  delta_hit1: delta('hit@1'),
-  regressed,
-  passed: now['recall@5'].score >= 0.90 && now.false_declines === 0,
-}}];
-```
-
-**9. Switch: route on outcome**
+**5. Switch: route on outcome**
 - Output "regression": `{{ $json.regressed }}` is true
-- Output "failed gate": `{{ $json.passed }}` is false
+- Output "failed": `{{ $json.passed }}` is false
 - Output "passed": fallback
 
-**10a. Slack or Email on regression**
+**6a. Notification on regression**
 ```
-Corpus change caused a retrieval regression.
+Corpus change made retrieval worse.
 
-recall@5  {{ $json.recall5 }}  ({{ $json.delta_recall5 }})
-hit@1     {{ $json.hit1 }}  ({{ $json.delta_hit1 }})
-false declines  {{ $json.false_declines }}
+recall@5  {{ $json.metrics["recall@5"] }}  ({{ $json.deltas["recall@5"] }})
+hit@1     {{ $json.metrics["hit@1"] }}  ({{ $json.deltas["hit@1"] }})
+MRR       {{ $json.metrics.mrr }}  ({{ $json.deltas.mrr }})
 
-The corpus has changed and retrieval got worse. Review before committing.
+False declines: {{ $json.metrics.false_declines }}
+Review before committing.
 ```
 
-**10b. Notification on pass**
+**6b. Notification on failed gate**
+```
+Eval failed the quality gate.
+
+recall@5 {{ $json.metrics["recall@5"] }} against threshold 0.90
+False declines: {{ $json.metrics.false_declines }}
+```
+
+**6c. Notification on pass**
 ```
 Corpus updated, eval passed.
 
-recall@5 {{ $json.recall5 }}, hit@5 {{ $json.hit5 }}, hit@1 {{ $json.hit1 }}, MRR {{ $json.mrr }}
-Abstention {{ $json.abstention }}, false declines {{ $json.false_declines }}
+recall@5 {{ $json.metrics["recall@5"] }}  (CI {{ $json.confidence_intervals["recall@5"][0] }} to {{ $json.confidence_intervals["recall@5"][1] }})
+hit@1 {{ $json.metrics["hit@1"] }}, MRR {{ $json.metrics.mrr }}
+Abstention {{ $json.metrics.abstention }}, false declines {{ $json.metrics.false_declines }}
+
+A1 {{ $json.subsets.A1["hit@5"] }}  A2 {{ $json.subsets.A2["hit@5"] }}  A3 {{ $json.subsets.A3["hit@5"] }}
 ```
 
-**11. Write the new hash**
-- Only on the pass branch, so a failing corpus keeps triggering until fixed
-- File path: `D:/golf-tool/.n8n-state/last_hash.json`
+Slack, Discord, email or a Telegram node all work. Pick whichever you would actually read.
 
-**12. Error Trigger workflow**
+**7. Error Trigger workflow**
 - Separate workflow, bound as the error handler
-- Sends the failing node name and message, so a broken API key does not fail silently
+- Sends the failing node and message, so a stopped service does not fail silently
+
+## State handling
+
+The service tracks the last successfully evaluated hash and the previous summary, so n8n does not need to persist anything between runs. Deliberate: n8n state handling is the fiddliest part of the platform, and keeping it in the service means the workflow is stateless and can be re-imported anywhere.
+
+State is only written on a pass, so a failing corpus keeps triggering until it is fixed rather than being silently accepted.
 
 ## What to expect when building it
 
-Things worth noting for the write-up, since "what did the platform make easy and what made it annoying" is the question you will be asked:
+Notes for the write-up, since "what did the platform make easy and what made it annoying" is the question you will be asked. Check these against your own experience rather than repeating them:
 
-- Reading a file and getting usable JSON out takes three nodes rather than one line of Python. Binary data comes back as a buffer and needs a Code node to parse.
-- Execute Command node returns stdout as a string, so any structured output needs parsing on the way back in. Printing JSON from the script rather than human-readable text makes this much easier, which is why `evaluate.py` writes a summary file.
-- Persisting state between runs has no built-in mechanism. Writing a file is the simplest option; static workflow data is the alternative but is easy to lose.
-- Error handling is genuinely good. The Error Trigger pattern catches everything without wrapping each node.
-- The visual layout makes the branch logic obvious in a way the equivalent script does not.
+- No Python in the container, which forced the architecture change above. Worth knowing before designing around Execute Command.
+- `localhost` inside the container is the container. `host.docker.internal` is the host.
+- HTTP Request plus JSON response is genuinely pleasant. The data is immediately usable in later nodes without parsing.
+- Accessing nested JSON with a key containing an @ needs bracket syntax, `$json.metrics["recall@5"]` rather than dot notation.
+- Error handling via the Error Trigger pattern is good, and catches everything without wrapping each node.
+- The visual branch logic is clearer than the equivalent script.
 
 ---
 

@@ -16,12 +16,15 @@ Supersedes the v1 eval document. Set A is now populated with real golfer vocabul
 
 Score these separately. A single headline number hides the failures that matter.
 
-| Subset | Queries | Metric | Target |
-|---|---|---|---|
-| A1: Own voice | 20 | Hit rate at k=5 | 0.85 |
-| A2: Direct | 26 | Hit rate at k=5 | 0.80 |
-| A3: Misdiagnosis | 8 | Hit rate at k=5 | 0.50 |
-| A4: Abstention | 6 | Correct refusal rate | 0.90 |
+| Subset | Queries | Answerable | Metric | Target | Achieved |
+|---|---|---|---|---|---|
+| A1: Own voice | 20 | 18 | Hit rate at k=5 | 0.85 | 0.94 |
+| A2: Sourced vocabulary | 33 | 33 | Hit rate at k=5 | 0.80 | 0.97 |
+| A3: Misdiagnosis | 8 | 8 | Hit rate at k=5 | 0.50 | 1.00 |
+| A4: Abstention | 6 | 0 | Correct refusal rate | 0.90 | 1.00 |
+| **Total** | **67** | **59** | | | |
+
+A1 has 20 queries but 18 answerable, because queries 7 and 15 describe good shots and should return no fault. Those two are scored with the abstention set rather than the retrieval set. All 6 A4 queries are unanswerable by design.
 
 **Why the misdiagnosis target is low.** These are queries where the golfer's own words point at the wrong cause. A system that simply echoes what the user said will score zero here while looking fine everywhere else. Half is a realistic bar and improving it is where the interesting engineering lives.
 
