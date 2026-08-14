@@ -1,5 +1,7 @@
 # golf-tool
 
+[![Retrieval eval](https://github.com/Sneakus/golf-tool/actions/workflows/eval.yml/badge.svg)](https://github.com/Sneakus/golf-tool/actions/workflows/eval.yml)
+
 A golf fault-diagnosis system. You describe a bad shot in plain language and it retrieves the relevant entry from a hand-written corpus, then produces one swing thought you can use standing over the ball.
 
 Built as a retrieval and evaluation exercise. The golf is the domain; the interesting part is that every design decision is measured rather than assumed.
