@@ -1,4 +1,8 @@
 .env
-*.json
+eval_summary.json
+eval_results.json
+hybrid_results.json
+generation_results.json
+.service-state/
 __pycache__/
 .n8n-state/
