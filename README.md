@@ -1,6 +1,6 @@
-# golf-tool
+# Golf Agent
 
-[![Retrieval eval](https://github.com/Sneakus/golf-tool/actions/workflows/eval.yml/badge.svg)](https://github.com/Sneakus/golf-tool/actions/workflows/eval.yml)
+[![Retrieval eval](https://github.com/Sneakus/Golf-Agent/actions/workflows/eval.yml/badge.svg)](https://github.com/Sneakus/Golf-Agent/actions/workflows/eval.yml)
 
 A golf fault-diagnosis system. You describe a bad shot in plain language and it retrieves the relevant entry from a hand-written corpus, then produces practical setup advice and one swing thought.
 
