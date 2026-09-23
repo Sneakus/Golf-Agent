@@ -210,14 +210,26 @@ Retrieval finds entries. Generation turns them into one piece of advice. Scored 
 | Rule | Enforcement | Why not just ask the model |
 |---|---|---|
 | Refuse when out of scope | Decided in code before the model is called | A model given a question and vaguely related documents will find something to say. Removing the opportunity is more reliable than instructing against it. |
-| One swing thought | Schema has a single `swing_thought` field | Nowhere to put a second instruction |
-| Under 15 words | Programmatic check on the output | Prompt instructions were followed about 80% of the time |
-| No mechanical jargon | Banned-term list checked in code, plus plain-language substitutions in the prompt | Same |
-| Every claim cited | `citations` array validated against what was actually retrieved | Catches a hallucinated entry ID rather than letting it pass |
+| One swing thought | Schema has a single `swing_thought` field | Nowhere to put a second swing instruction |
+| Setup does not count as a swing thought | Setup is a separate list limited to pre-address actions | Aim, ball position, stance, gripping down and club choice do not compete for attention during the swing |
+| Per-field and total word limits | Programmatic checks on every field, plus a 140-word backstop | Prompt instructions alone are not a guarantee |
+| No mechanical jargon | Banned-term list checked across every text field, plus plain-language substitutions in the prompt | Same |
+| Plain punctuation | Every text field rejects em dashes and en dashes | Keeps output ready for direct display |
+| Every claim cited | All citations and field-level source IDs are validated against retrieval | Catches a hallucinated entry ID rather than letting it pass |
+| Follow-up diagnosis is grounded | Differential rows are parsed from corpus notes at runtime, with compensation risk as fallback | Keeps uncertainty useful without indexing the notes |
 
 Failures trigger one repair attempt with the specific problems fed back, then revalidation.
 
-## Results, 7 Aug 2026
+## Richer answer format baseline, 23 Sep 2026
+
+This is a new baseline, not a continuation of the earlier generation results. The output shape changed, so its length, repair and cost numbers are not directly comparable.
+
+| Date | Change | Correct refusals | False refusals | Validation failures | Repaired | Words | Setup steps | Tokens and cost | Verification |
+|---|---|---|---|---|---|---|---|---|---|
+| 23 Sep 2026 | New answer format baseline | 8/8 | 0 | 0 after repair | 18/59 on first attempt | 68.6 average, 98 maximum | 39/59 answers | 293,324 input, 20,385 output, about $1.20 per full run | Full generation eval |
+| 23 Sep 2026 | L001 corpus fixes from reading generated answers | | | | | | | | Ambiguous posture wording produced "stay tall", the opposite of the correct cue. An overstated loft explanation claimed a 3-wood had extra loft. Both were fixed in L001. Retrieval remained hit@5 0.966. Posture was verified on both L001 queries and loft on the 3-wood query. Not a full generation rerun. |
+
+## Earlier answer format results, 7 Aug 2026
 
 | Run | Answered | Correct refusals | False refusals | Validation failures |
 |---|---|---|---|---|

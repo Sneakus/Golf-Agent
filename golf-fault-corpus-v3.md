@@ -685,16 +685,18 @@ Every entry has the same fields:
 
 **How I'd describe it:** ball below my feet and it went right, sloping away from me, sidehill lie
 
-**What it is:** A lie that promotes a fade or slice for every golfer, regardless of swing.
+**What it is:** A lie that promotes a fade or slice for every golfer, regardless of swing. With lofted clubs, much of the effect comes from the slope tilting the clubface so its loft points right of the target. That effect grows with loft, so it is large with wedges and short irons and small with a driver or fairway wood. With long clubs the curve comes mainly from the bent-over posture, which makes a full turn through the ball harder and can leave the face open.
 
 **Why it matters:** The resulting right-curving shot is usually a lie effect, not a swing fault. Diagnosing it as a slice will send you fixing something that is not broken.
 
 **Adjustments**
 - Aim left to allow for the curve.
-- Grip closer to the end of the club and stay in posture, since standing up is the common error.
+- Flex your knees more at address to get down to the ball.
+- Hold the club near the end of the grip, since the ball is further from you.
 - Take one more club, as the lie costs distance.
+- Stay at the same height through the ball rather than rising up. Standing up is the common error and causes thin and topped shots.
 
-**Evidence tier:** settled
+**Evidence tier:** settled for the curve direction and the loft effect, consensus for the posture cause
 
 **Compensation risk:** If your log shows slices only from this lie, the corpus should suppress the slice diagnosis entirely.
 
