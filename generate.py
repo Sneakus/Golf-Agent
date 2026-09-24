@@ -90,8 +90,6 @@ def advice_schema(entry_ids):
             },
             "setup_steps": {
                 "type": "array",
-                "minItems": 0,
-                "maxItems": 3,
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
