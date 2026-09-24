@@ -15,11 +15,11 @@ Retrieval, 59 answerable and 8 non-fault queries, 95% bootstrap confidence inter
 | hit@5 | 0.966 | 0.915 to 1.000 | Correct entry in the top five results |
 | hit@1 | 0.729 | 0.610 to 0.831 | Correct entry ranked first |
 | recall@5 | 0.928 | 0.869 to 0.975 | Share of relevant entries found |
-| MRR | 0.828 | 0.749 to 0.899 | How high the first correct hit lands |
-| NDCG@5 | 0.846 | 0.774 to 0.908 | Rank-weighted quality |
+| MRR | 0.825 | 0.745 to 0.897 | How high the first correct hit lands |
+| NDCG@5 | 0.844 | 0.771 to 0.907 | Rank-weighted quality |
 | Abstention | 1.000 | | 8 of 8, zero false declines |
 
-**hit@5 and hit@1 are different claims.** hit@5 of 0.966 means the correct entry appeared somewhere in the top five, not that the tool gave the right answer. The number for ranking it first is hit@1 at 0.729. MRR of 0.828 sitting close to hit@1 means that when the right entry is not first it is almost always second.
+**hit@5 and hit@1 are different claims.** hit@5 of 0.966 means the correct entry appeared somewhere in the top five, not that the tool gave the right answer. The number for ranking it first is hit@1 at 0.729. MRR of 0.825 sitting close to hit@1 means that when the right entry is not first it is almost always second.
 
 Generation, richer-answer baseline: 59 answered, 8 of 8 correct refusals, 0 false refusals, and 0 validation failures after repair. The first attempt needed repair on 18 answers. Answers averaged 68.6 words, reached 98 at most, and 39 of 59 included setup steps. The full run used 293,324 input and 20,385 output tokens, about $1.20.
 
@@ -35,9 +35,9 @@ Causes are always plural. A slice can come from path, from face angle, or from a
 
 **Abstention.** Out-of-scope questions are handled by giving retrieval something correct to return rather than by a confidence threshold. Equipment, rules, handicap, mental game, injury, etiquette each have an entry. If one ranks first, the tool declines and redirects.
 
-**Generation.** Output shape is a schema the model must fill: what happened, up to three next-shot setup steps, one swing thought, why, a follow-up diagnostic, and sources. Setup steps happen before address, so they do not compete for attention during the swing. The one-thought limit applies to the swing only.
+**Generation.** The model fills a strict tool schema: what happened, up to three setup steps, one headline thought, and why. Each setup step names the entry and the exact Fixes or Adjustments line it comes from, and must share meaningful words with that line. Code writes "If it keeps happening" from the differential table, in either direction, using the table's own words, and builds the sources list from every entry the answer used. Compensation notes and evidence tiers are removed from the text the model sees. They stay in the corpus and in the retrieval index. Strategy and conditions headlines are labelled Key thought. The one-thought limit still applies only to that headline.
 
-Setup steps are restricted to aim, ball position, stance, gripping down, and club choice taken from a retrieved entry's Fixes or Adjustments. The follow-up diagnostic uses the differential table parsed at runtime from the corpus notes, then falls back to the primary entry's compensation risk. Code checks every field's length, total length, mechanical jargon, punctuation, and source IDs.
+Live Anthropic calls require `GOLF_LIVE=1`. Otherwise generate.py replays cached responses and stops on a cache miss. Responses are cached by a hash of the request. A live eval prints an estimated cost from the last saved token counts and stops above $0.50 unless `--confirm-cost` is set. `--max-calls` defaults to 25. Generation reads `retrieval_snapshot.json` unless `--fresh-retrieval` is given, and refuses a snapshot whose configuration hash does not match. The model's self-reported fit field was removed: it never fired in testing, including on the two known retrieval misses.
 
 Refusal is decided in code before the model is called. A model handed a question and loosely related documents will usually find something to say, so removing the opportunity is more reliable than instructing against it.
 

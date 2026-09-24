@@ -218,6 +218,11 @@ Retrieval finds entries. Generation turns them into one piece of advice. Scored 
 | No mechanical jargon | Banned-term list checked across every text field, plus plain-language substitutions in the prompt | Same |
 | Plain punctuation | Every text field rejects em dashes and en dashes | Keeps output ready for direct display |
 | Every claim cited | All citations and field-level source IDs are validated against retrieval | Catches a hallucinated entry ID rather than letting it pass |
+| Setup step matches its line | Each step carries `entry_id` and `fix_index`, and must share meaningful words with that specific Fixes or Adjustments line | A retrieved ID can still be attached to another entry's wording. Lines that only point elsewhere are not selectable |
+| Follow-up is code | "If it keeps happening" is the differential table's test text, shown only when a confusable was retrieved. Rows apply in both directions | The model no longer writes this field, so it cannot satisfy two rules at once |
+| Sources are code | Built from every entry ID the answer used | The model does not invent the citation list |
+| Fit was removed | The model used to report clear, ambiguous, or none | It never fired in testing, including on the two known retrieval misses, so the model's own judgement of fit is not relied on. Retrieval-side miss signals are being evaluated instead |
+| Key thought for decisions | S and C entries label the headline Key thought | A strategy or conditions cue is not a swing cue |
 | Follow-up diagnosis is grounded | Differential rows are parsed from corpus notes at runtime, with compensation risk as fallback | Keeps uncertainty useful without indexing the notes |
 
 Failures trigger one repair attempt with the specific problems fed back, then revalidation.
@@ -282,6 +287,8 @@ Record every run with a date. The trend is more convincing than any single score
 | 7 Aug 2026 | Full metric set added: MRR, NDCG, recall@k, bootstrap CIs, latency and cost. Config unchanged | 0.89 | 0.97 | 1.00 | 1.00 | 0.73 | hit@5 0.949, MRR 0.823, NDCG@5 0.837, recall@5 0.910. Eval now gated in CI |
 | 7 Aug 2026 | Extended F007 alias line with plain-language phrasings for hitting the ground before the ball | | | | | | Corpus fix, not a retrieval change. Query 1 was a vocabulary gap |
 | 24 Sep 2026 | Query 18 label correction. No change to retrieval | 0.94 | 0.97 | 1.00 | 1.00 | 0.73 | Label change, not a system change. hit@5 stayed 0.966 and hit@1 stayed 0.729. recall@5 moved from 0.927 to 0.928, MRR from 0.827 to 0.828, and NDCG@5 from 0.844 to 0.846, because R001 was already retrieved and is now counted as relevant |
+| 24 Sep 2026 | Review corpus fixes: F012 tee height split into a setup step, F009 ball-position fix scoped to wedges and short irons, C002 no longer says wind adds spin, L004 states why downhill contact is difficult | 0.94 | 0.97 | 1.00 | 1.00 | 0.73 | Wording fixes, found by reading answers. hit@5 0.966, hit@1 0.729 and recall@5 0.928 unchanged. MRR moved from 0.828 to 0.825 and NDCG@5 from 0.846 to 0.844. The same two queries still miss |
+| 24 Sep 2026 | Differential tests rewritten in plain language with no entry codes | 0.94 | 0.97 | 1.00 | 1.00 | 0.73 | The table is not indexed. hit@5 0.966, hit@1 0.729, recall@5 0.928, MRR 0.825, NDCG@5 0.844, abstention 1.000. Nothing moved. Code now shows this text directly to the golfer |
 
 **Strategy comparison, 7 Aug 2026.** Same 59 answerable queries, four ways of embedding the same corpus.
 

@@ -233,7 +233,7 @@ Every entry has the same fields:
 
 **Fixes**
 - Same as F008.
-- Check that ball position has not crept back in the stance.
+- With wedges and short irons, check that ball position has not crept back in the stance.
 
 **Evidence tier:** settled
 
@@ -299,7 +299,8 @@ Every entry has the same fields:
 3. Weight moving toward the target too aggressively with the driver. Signal: divot after a driver shot from a tee.
 
 **Fixes**
-- Tee it higher and feel the clubhead travelling level or slightly up at impact.
+- Tee the ball higher.
+- Feel the clubhead travelling level or slightly up as it meets the ball.
 - Feel the trail shoulder staying below the lead shoulder through impact.
 
 **Evidence tier:** settled
@@ -738,7 +739,7 @@ Every entry has the same fields:
 
 **How I'd describe it:** downhill lie, ball below me on a slope, came out low and running
 
-**What it is:** The slope reduces effective loft, producing lower launch and more run. Also the hardest lie to make clean contact from.
+**What it is:** The slope reduces effective loft, producing lower launch and more run. Also the hardest lie to make clean contact from. The ground behind the ball is higher than the ball, so the club tends to catch the slope first unless the swing follows the slope down, and trying to lift the ball to avoid that causes thin contact.
 
 **Adjustments**
 - Take less club and expect run.
@@ -893,7 +894,7 @@ Every entry has the same fields:
 
 **How I'd describe it:** into the wind, downwind, crosswind pushed it, blowing hard
 
-**What it is:** Wind affects carry and curvature disproportionately, since a ball hit into wind spins more and climbs.
+**What it is:** Wind affects carry and curvature disproportionately. Into the wind, the faster airflow over the ball increases the lift from its backspin, so the ball climbs and falls short.
 
 **Adjustments**
 - Into wind, club up and swing easier rather than harder, since extra speed adds spin and makes it climb.
@@ -1008,20 +1009,20 @@ The table below lists which entries are commonly mistaken for which. When the fe
 
 | Entry | Commonly confused with | What separates them |
 |---|---|---|
-| F011 shank | F013 heel strike | Shank hits the hosel and fires sharply right. Heel strike stays on the face, just loses ball speed and fades. Check the face marking. |
-| F008 thin | F009 top | Degree, not kind. Thin still gets airborne, top does not. |
-| F001 slice | F002 pull-slice, F003 push-slice | Where it starts. Left means F002, right means F003, straight means F001. |
-| F004 hook | F005 pull, F002 pull-slice | Whether it curves. A pull goes straight left with no curve. |
-| F001 slice | L001 ball below feet | If it only happens on that lie, it is the lie. |
-| F004 hook | L002 ball above feet | Same test. |
-| F007 fat | F015 chunked chip | Same fault, different context. Full swing versus short game, and the fixes differ. |
+| F011 shank | F013 heel strike | A shank comes off the hosel and shoots right. A heel strike stays on the face and fades. |
+| F008 thin | F009 top | A thin shot still gets airborne. A topped shot does not. |
+| F001 slice | F002 pull-slice, F003 push-slice | Check where it started: left means a pull-slice, right means a push-slice, straight means a slice. |
+| F004 hook | F005 pull, F002 pull-slice | Check the curve. A pull goes straight left with no curve, and a pull-slice curves back right. |
+| F001 slice | L001 ball below feet | If it only happens with the ball below your feet, the lie is the cause. |
+| F004 hook | L002 ball above feet | If it only happens with the ball above your feet, the lie is the cause. |
+| F007 fat | F015 chunked chip | A fat full swing and a chunked chip share a cause, but the fixes differ. |
 | F015 chunked chip | D001 decelerated | Did the club hit the ground first, or was the strike clean but gutless? |
 | F017 weak high flight | F014 toe strike | Check the face marking before assuming a swing fault. |
-| D003 wrong club short | C001 cold, F017 distance loss | Conditions and strike quality both mimic a club selection error. |
-| D004 wrong club long | L006 flyer lie | A flyer from light rough is not over-clubbing. |
-| P001 putt short | P003 misread, P004 pace and break | A putt finishing short and low may have had a perfect read. |
-| P001, P002 | P006 green speed | If it is happening all round, it is calibration, not stroke. |
-| F008 thin, F007 fat | L004 downhill lie | Contact misses from a downhill lie are expected and should be discounted. |
+| D003 wrong club short | C001 cold, F017 distance loss | Cold air or a weak strike can look like the wrong club. Rule those out first. |
+| D004 wrong club long | L006 flyer lie | If it came from light rough, a flyer lie may have added the distance, not the club. |
+| P001 putt short | P003 misread, P004 pace and break | A putt finishing short and low may have had a perfect read with too little pace. |
+| P001, P002 | P006 green speed | If it is happening on every green, it is the speed of the greens, not your stroke. |
+| F008 thin, F007 fat | L004 downhill lie | On a downhill lie, thin and fat contact are common, so do not blame your swing. |
 
 **The escalation rule.** After a fix is logged as no change or worse, and the sample size threshold has been met, the tool should say so plainly and name the alternative. Something like: "That fix has not moved the needle over 40 shots. This might not be a shank at all. Heel strikes feel almost the same. Check where the ball is marking the face."
 

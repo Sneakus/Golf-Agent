@@ -1,0 +1,10 @@
+---
+description: Block live Golf Agent generation and Anthropic API calls
+alwaysApply: true
+---
+
+# No live generation
+
+Never set `GOLF_LIVE`. Never run a live generation eval. Never make Anthropic API calls.
+
+Retrieval scripts and `evaluate.py` use OpenAI embeddings only. Those may run. Generation stays in replay mode unless the user has already set `GOLF_LIVE=1` themselves and explicitly asks for a live run.

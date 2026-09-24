@@ -7,3 +7,6 @@ generation_results.json
 __pycache__/
 .n8n-state/golf-tool-handover.md
 review/
+.golf-cache/
+retrieval_snapshot.json
+
