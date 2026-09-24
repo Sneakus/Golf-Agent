@@ -55,9 +55,11 @@ Written by you before seeing the v2 corpus, so uncontaminated. These are closest
 | 15 | 5h shot perfectly straight down middle | No fault |
 | 16 | underpowered putter and overcompensated for green sloping left | P001 and P004 |
 | 17 | went to punch out ball from the rough underneath a tree, went well but slightly overpowered | R001 (see gap note) |
-| 18 | ball in front of tree, chipped out right but thinned it, bounced along dry ground, rolled on cart path, rested in rough | F008 primary, S004 and C003 secondary |
+| 18 | ball in front of tree, chipped out right but thinned it, bounced along dry ground, rolled on cart path, rested in rough | F008 primary, S004 and C003 secondary, R001 |
 | 19 | tried opening club face with lob wedge to chip onto a green up a slope, thinned and ended up in a sand bunker on other side | F010 |
 | 20 | got out of bunker onto green with sand wedge, direction fine but left it quite short | D005 |
+
+**Query 18.** R001 was added to the corpus after this query was labelled, and covers exactly this kind of recovery shot. Query 17 was already relabelled to R001 at the time; 18 was missed.
 
 ---
 
@@ -228,6 +230,7 @@ This is a new baseline, not a continuation of the earlier generation results. Th
 |---|---|---|---|---|---|---|---|---|---|
 | 23 Sep 2026 | New answer format baseline | 8/8 | 0 | 0 after repair | 18/59 on first attempt | 68.6 average, 98 maximum | 39/59 answers | 293,324 input, 20,385 output, about $1.20 per full run | Full generation eval |
 | 23 Sep 2026 | L001 corpus fixes from reading generated answers | | | | | | | | Ambiguous posture wording produced "stay tall", the opposite of the correct cue. An overstated loft explanation claimed a 3-wood had extra loft. Both were fixed in L001. Retrieval remained hit@5 0.966. Posture was verified on both L001 queries and loft on the 3-wood query. Not a full generation rerun. |
+| 24 Sep 2026 | Answer-level accuracy on the saved richer-answer run | | | | | | | | 55 of 59 (93%), 95% CI 0.864 to 0.983, as originally labelled. Of the 57 queries where retrieval placed the correct entry in the top five, the answer chose it in 55. After the query 18 correction, 56 of 59 (95%), 95% CI 0.881 to 1.000, which is 56 of those same 57. R001 was added to the corpus after query 18 was labelled and covers exactly this kind of recovery shot. Query 17 was already relabelled to R001 at the time; 18 was missed. This run predates the L001 fixes. Not a generation rerun. |
 
 ## Earlier answer format results, 7 Aug 2026
 

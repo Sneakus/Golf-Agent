@@ -6,3 +6,4 @@ generation_results.json
 .service-state/
 __pycache__/
 .n8n-state/golf-tool-handover.md
+review/

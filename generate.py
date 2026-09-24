@@ -602,6 +602,56 @@ def answer(query, retriever, differentials, model=MODEL, k=5, retry=True, q_vec=
     }
 
 
+def answer_accuracy_rows(results):
+    """Answered queries whose diagnosed entry is one of the expected entries."""
+    rows = []
+    for result in results:
+        if result.get("refused"):
+            continue
+        expected = result["expected"]
+        chosen = result["advice"]["entry_id"]
+        rows.append({
+            "subset": result["subset"],
+            "n": result["n"],
+            "query": result["query"],
+            "expected": expected,
+            "chosen": chosen,
+            "correct": float(chosen in set(expected)),
+        })
+    return rows
+
+
+def report_answer_accuracy(results):
+    """Overall and per-subset accuracy with the same bootstrap CI as retrieval."""
+    from evaluate import bootstrap_ci
+
+    rows = answer_accuracy_rows(results)
+    print("\nAnswer-level accuracy: diagnosed entry is one of the expected entries")
+    print(f"{'Metric':<12} {'Score':>7}   {'95% CI':>16}   Correct")
+    print("-" * 60)
+
+    def emit(label, group):
+        vals = [row["correct"] for row in group]
+        mean = sum(vals) / len(vals)
+        lo, hi = bootstrap_ci(vals)
+        print(f"{label:<12} {mean:>7.3f}   [{lo:.3f}, {hi:.3f}]   "
+              f"{int(sum(vals))}/{len(vals)}")
+
+    emit("overall", rows)
+    for subset in ("A1", "A2", "A3"):
+        group = [row for row in rows if row["subset"] == subset]
+        if group:
+            emit(subset, group)
+
+    misses = [row for row in rows if not row["correct"]]
+    if misses:
+        print("\nDiagnosis mismatches:")
+        for row in misses:
+            print(f"  [{row['subset']} #{row['n']}] expected {', '.join(row['expected'])}, "
+                  f"chose {row['chosen']}")
+            print(f"      {row['query'][:70]}")
+
+
 # ------------------------------------------------------------------ cli
 
 def print_answer(a, plain=False):
@@ -688,6 +738,7 @@ def main():
         )
         a["subset"] = q["subset"]
         a["n"] = q["n"]
+        a["expected"] = q["expected"]
         a["should_refuse"] = q["expects_nothing"]
         results.append(a)
         print(f"  {i}/{len(queries)}", file=sys.stderr)
@@ -716,6 +767,7 @@ def main():
         print(f"Average answer words: {sum(answer_word_counts) / len(answer_word_counts):.1f}")
         print(f"Maximum answer words: {max(answer_word_counts)}")
     print(f"Answers with setup steps: {with_setup}/{len(answered)}")
+    report_answer_accuracy(results)
 
     false_ref = [r for r in refused if not r["should_refuse"]]
     if false_ref:
