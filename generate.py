@@ -762,8 +762,24 @@ def print_answer(answer_row, plain=False):
             print(f"    - {problem}")
 
 
+def latest_full_results(fallback):
+    """Newest dated file that holds a full 67-query run, not the last file written."""
+    candidates = []
+    for path in Path(".").glob("generation_results-*.json"):
+        try:
+            rows = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(rows, list) and len(rows) >= 67:
+            candidates.append(path)
+    if not candidates:
+        return Path(fallback)
+    return max(candidates, key=lambda path: path.stat().st_mtime)
+
+
 def estimate_cost(saved_path, n_queries, batch=False):
     """Average saved cost per answer, times the queries in this run, plus a repair allowance."""
+    saved_path = latest_full_results(saved_path)
     saved = json.loads(Path(saved_path).read_text(encoding="utf-8"))
     rows = [row for row in saved if row.get("tokens") and not row.get("refused")]
     if not rows or n_queries <= 0:
@@ -778,7 +794,7 @@ def estimate_cost(saved_path, n_queries, batch=False):
     if batch:
         cost *= 0.5
     basis = (
-        f"average of {len(rows)} saved answers (${average:.4f} each) "
+        f"average of {len(rows)} saved answers in {Path(saved_path).name} (${average:.4f} each) "
         f"times {n_queries} {'query' if n_queries == 1 else 'queries'} in this run, "
         f"plus a repair allowance of {repaired}/{len(rows)}"
         + (" at batch half price" if batch else "")
@@ -949,10 +965,19 @@ def refusal_row(query, found):
     }
 
 
+def read_cache(payload, tool_name):
+    path = CACHE_DIR / f"{cache_key({'payload': payload, 'tool': tool_name})}.json"
+    if not path.exists():
+        return None
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    return saved["advice"], saved["usage"]["in"], saved["usage"]["out"]
+
+
 def run_batch(queries, found_by_n, entry_ids, differentials, calls, submit):
     """Turn batch results into the same rows normal eval mode scores. submit fetches results."""
     requests = []
     pending = []
+    cached_first = []
     results = []
     for query in queries:
         found = found_by_n[query["n"]]
@@ -963,6 +988,10 @@ def run_batch(queries, found_by_n, entry_ids, differentials, calls, submit):
             results.append(row)
             continue
         payload, tool_name = request_payload(query["query"], found, entry_ids)
+        hit = read_cache(payload, tool_name)
+        if hit is not None:
+            cached_first.append((query, payload, tool_name, hit))
+            continue
         requests.append({"custom_id": f"q{query['n']}", "params": payload})
         pending.append((query, payload, tool_name))
     first = submit(requests) if requests else []
@@ -971,6 +1000,43 @@ def run_batch(queries, found_by_n, entry_ids, differentials, calls, submit):
     cached = 0
     rows_by_n = {}
     by_custom = {item.custom_id: item for item in first}
+
+    def take_first(query, payload, tool_name, advice, usage_in, usage_out, from_cache):
+        if not from_cache:
+            store_cache(payload, tool_name, advice, usage_in, usage_out)
+        found = found_by_n[query["n"]]
+        advice = apply_code_fields(scrub_advice(advice), found, differentials)
+        problems = validate(advice, found)
+        row = {
+            "retried": False,
+            "query": query["query"],
+            "retrieved": found["ids"],
+            "refused": False,
+            "top_dense_sim": round(found["top_dense_sim"], 3),
+            "advice": advice,
+            "validation_problems": problems,
+            "tokens": {"in": usage_in, "out": usage_out},
+            "subset": query["subset"],
+            "n": query["n"],
+            "expected": query["expected"],
+            "should_refuse": query["expects_nothing"],
+        }
+        if not problems:
+            rows_by_n[query["n"]] = row
+            return
+        row["retried"] = True
+        field = single_field_repair(problems)
+        repair_payload, repair_tool = request_payload(
+            query["query"], found, entry_ids, problems=problems,
+            previous=advice.get(field, advice) if field else advice,
+            field=field,
+        )
+        repairs.append((query, row, repair_payload, repair_tool, field))
+        rows_by_n[query["n"]] = row
+
+    for query, payload, tool_name, hit in cached_first:
+        advice, usage_in, usage_out = hit
+        take_first(query, payload, tool_name, advice, usage_in, usage_out, True)
     for query, payload, tool_name in pending:
         item = by_custom.get(f"q{query['n']}")
         if item is None:
@@ -984,37 +1050,11 @@ def run_batch(queries, found_by_n, entry_ids, differentials, calls, submit):
         if advice is None:
             errors.append(f"q{query['n']}: succeeded without the tool call")
             continue
-        store_cache(payload, tool_name, advice, message.usage.input_tokens, message.usage.output_tokens)
         cached += 1
-        found = found_by_n[query["n"]]
-        advice = apply_code_fields(scrub_advice(advice), found, differentials)
-        problems = validate(advice, found)
-        row = {
-            "retried": False,
-            "query": query["query"],
-            "retrieved": found["ids"],
-            "refused": False,
-            "top_dense_sim": round(found["top_dense_sim"], 3),
-            "advice": advice,
-            "validation_problems": problems,
-            "tokens": {"in": message.usage.input_tokens, "out": message.usage.output_tokens},
-            "subset": query["subset"],
-            "n": query["n"],
-            "expected": query["expected"],
-            "should_refuse": query["expects_nothing"],
-        }
-        if not problems:
-            rows_by_n[query["n"]] = row
-            continue
-        row["retried"] = True
-        field = single_field_repair(problems)
-        repair_payload, repair_tool = request_payload(
-            query["query"], found, entry_ids, problems=problems,
-            previous=advice.get(field, advice) if field else advice,
-            field=field,
+        take_first(
+            query, payload, tool_name, advice,
+            message.usage.input_tokens, message.usage.output_tokens, False,
         )
-        repairs.append((query, row, repair_payload, repair_tool, field))
-        rows_by_n[query["n"]] = row
     if errors:
         for line in errors:
             print(line)
@@ -1023,27 +1063,36 @@ def run_batch(queries, found_by_n, entry_ids, differentials, calls, submit):
             f"{cached} successes were cached. No repair batch was submitted."
         )
     if repairs:
-        second = submit([
-            {"custom_id": f"repair{query['n']}", "params": payload}
-            for query, _row, payload, _tool, _field in repairs
-        ])
+        repair_requests = []
+        repair_ready = []
+        for query, row, payload, tool_name, field in repairs:
+            hit = read_cache(payload, tool_name)
+            if hit is not None:
+                repair_ready.append((query, row, payload, tool_name, field, hit[0], hit[1], hit[2], True))
+            else:
+                repair_requests.append({"custom_id": f"repair{query['n']}", "params": payload})
+                repair_ready.append((query, row, payload, tool_name, field, None, None, None, False))
+        second = submit(repair_requests) if repair_requests else []
         by_repair = {item.custom_id: item for item in second}
         repair_errors = []
-        for query, row, payload, tool_name, field in repairs:
+        for query, row, payload, tool_name, field, advice, usage_in, usage_out, from_cache in repair_ready:
             custom_id = f"repair{query['n']}"
-            item = by_repair.get(custom_id)
-            if item is None:
-                repair_errors.append(f"{custom_id}: missing from batch results")
-                continue
-            if item.result.type != "succeeded":
-                repair_errors.append(batch_error_line(item))
-                continue
-            message = item.result.message
-            advice = tool_input(message, tool_name)
-            if advice is None:
-                repair_errors.append(f"{custom_id}: succeeded without the tool call")
-                continue
-            store_cache(payload, tool_name, advice, message.usage.input_tokens, message.usage.output_tokens)
+            if not from_cache:
+                item = by_repair.get(custom_id)
+                if item is None:
+                    repair_errors.append(f"{custom_id}: missing from batch results")
+                    continue
+                if item.result.type != "succeeded":
+                    repair_errors.append(batch_error_line(item))
+                    continue
+                message = item.result.message
+                advice = tool_input(message, tool_name)
+                if advice is None:
+                    repair_errors.append(f"{custom_id}: succeeded without the tool call")
+                    continue
+                usage_in = message.usage.input_tokens
+                usage_out = message.usage.output_tokens
+                store_cache(payload, tool_name, advice, usage_in, usage_out)
             found = found_by_n[query["n"]]
             if field:
                 row["advice"] = splice_field(row["advice"], field, scrub_dashes(advice["text"]))
@@ -1051,8 +1100,8 @@ def run_batch(queries, found_by_n, entry_ids, differentials, calls, submit):
                 row["advice"] = scrub_advice(advice)
             row["advice"] = apply_code_fields(row["advice"], found, differentials)
             row["validation_problems"] = validate(row["advice"], found)
-            row["tokens"]["in"] += message.usage.input_tokens
-            row["tokens"]["out"] += message.usage.output_tokens
+            row["tokens"]["in"] += usage_in
+            row["tokens"]["out"] += usage_out
         if repair_errors:
             for line in repair_errors:
                 print(line)
