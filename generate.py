@@ -688,6 +688,30 @@ def answer_accuracy_rows(results):
     return rows
 
 
+def finish_eval(results, calls, batch=False, write=True):
+    answered = [row for row in results if not row["refused"]]
+    refused = [row for row in results if row["refused"]]
+    should = [row for row in results if row["should_refuse"]]
+    incoming = sum(row.get("tokens", {}).get("in", 0) for row in results)
+    outgoing = sum(row.get("tokens", {}).get("out", 0) for row in results)
+    cost = incoming * INPUT_USD_PER_TOKEN + outgoing * OUTPUT_USD_PER_TOKEN
+    if batch:
+        cost *= 0.5
+    print(f"\nAnswered: {len(answered)}   Refused: {len(refused)}")
+    print(f"Correct refusals: {sum(1 for row in should if row['refused'])}/{len(should)}")
+    print(f"False refusals: {sum(1 for row in refused if not row['should_refuse'])}")
+    print(f"Repaired on retry: {sum(1 for row in answered if row.get('retried'))}")
+    failed = [row for row in answered if row["validation_problems"]]
+    print(f"Validation failures after retry: {len(failed)}/{len(answered)}")
+    report_answer_accuracy(results)
+    print(f"Tokens: {incoming:,} in, {outgoing:,} out")
+    print(f"Estimated cost: ${cost:.2f}" + (" at batch half price" if batch else ""))
+    if write:
+        dated = write_run_results(results)
+        print(f"Wrote {dated} and generation_results.json")
+    print(f"Anthropic calls this run: {calls['made']}")
+
+
 def report_answer_accuracy(results):
     from evaluate import bootstrap_ci
     rows = answer_accuracy_rows(results)
@@ -845,6 +869,57 @@ def run_stub():
     print("Replay stub passed: repair, dash scrub, stripped context, code sources, no API call.")
     print_answer(finished, plain=True)
 
+    queries = [
+        {"n": 1, "query": "thin contact", "subset": "A1", "expected": ["F008"], "expects_nothing": False},
+        {"n": 2, "query": "what driver should I buy", "subset": "A4", "expected": [], "expects_nothing": True},
+    ]
+    found_by_n = {
+        1: result,
+        2: {
+            "ids": ["X001"],
+            "entries": [{"id": "X001", "name": "Out of scope", "text": "Buy clubs elsewhere."}],
+            "top_dense_sim": 0.9,
+            "scores": {},
+        },
+    }
+
+    class BatchBlock:
+        def __init__(self, name, data):
+            self.type = "tool_use"
+            self.name = name
+            self.input = data
+
+    class BatchMessage:
+        def __init__(self, name, data):
+            self.content = [BatchBlock(name, data)]
+            self.usage = Usage(4, 3)
+
+    class BatchItem:
+        def __init__(self, custom_id, name, data):
+            self.custom_id = custom_id
+            self.result = type("Result", (), {"type": "succeeded", "message": BatchMessage(name, data)})()
+
+    def submit(requests):
+        items = []
+        for request in requests:
+            custom_id = request["custom_id"]
+            if custom_id.startswith("repair"):
+                items.append(BatchItem(custom_id, "rewrite_field", {"text": "The club met the ball above its middle."}))
+            else:
+                items.append(BatchItem(custom_id, "give_advice", stub(None, "give_advice")))
+        return items
+
+    batch_calls = {"made": 0, "max": 25}
+    batch_results = run_batch(queries, found_by_n, ["F008", "X001"], {}, batch_calls, submit)
+    assert sum(not row["refused"] for row in batch_results) == 1
+    assert sum(row["refused"] for row in batch_results) == 1
+    answered = next(row for row in batch_results if not row["refused"])
+    assert answered["retried"] is True
+    assert not answered["validation_problems"], answered["validation_problems"]
+    assert batch_calls["made"] == 0
+    print("Replay stub batch summary:")
+    finish_eval(batch_results, batch_calls, batch=True, write=False)
+
 
 def write_run_results(results):
     text = json.dumps(results, indent=2)
@@ -853,6 +928,139 @@ def write_run_results(results):
     dated.write_text(text, encoding="utf-8")
     Path("generation_results.json").write_text(text, encoding="utf-8")
     return dated
+
+
+def tool_input(message, tool_name):
+    for block in message.content:
+        if block.type == "tool_use" and block.name == tool_name:
+            return block.input
+    return None
+
+
+def refusal_row(query, found):
+    refusal = decide_refusal(found)
+    return {
+        "query": query["query"],
+        "retrieved": found["ids"],
+        **refusal,
+        "top_dense_sim": round(found["top_dense_sim"], 3),
+        "tokens": {"in": 0, "out": 0},
+        "retried": False,
+    }
+
+
+def run_batch(queries, found_by_n, entry_ids, differentials, calls, submit):
+    """Turn batch results into the same rows normal eval mode scores. submit fetches results."""
+    requests = []
+    pending = []
+    results = []
+    for query in queries:
+        found = found_by_n[query["n"]]
+        if decide_refusal(found)["refused"]:
+            row = refusal_row(query, found)
+            row.update(subset=query["subset"], n=query["n"], expected=query["expected"],
+                       should_refuse=query["expects_nothing"])
+            results.append(row)
+            continue
+        payload, tool_name = request_payload(query["query"], found, entry_ids)
+        requests.append({"custom_id": f"q{query['n']}", "params": payload})
+        pending.append((query, payload, tool_name))
+    first = submit(requests) if requests else []
+    repairs = []
+    errors = []
+    cached = 0
+    rows_by_n = {}
+    by_custom = {item.custom_id: item for item in first}
+    for query, payload, tool_name in pending:
+        item = by_custom.get(f"q{query['n']}")
+        if item is None:
+            errors.append(f"q{query['n']}: missing from batch results")
+            continue
+        if item.result.type != "succeeded":
+            errors.append(batch_error_line(item))
+            continue
+        message = item.result.message
+        advice = tool_input(message, tool_name)
+        if advice is None:
+            errors.append(f"q{query['n']}: succeeded without the tool call")
+            continue
+        store_cache(payload, tool_name, advice, message.usage.input_tokens, message.usage.output_tokens)
+        cached += 1
+        found = found_by_n[query["n"]]
+        advice = apply_code_fields(scrub_advice(advice), found, differentials)
+        problems = validate(advice, found)
+        row = {
+            "retried": False,
+            "query": query["query"],
+            "retrieved": found["ids"],
+            "refused": False,
+            "top_dense_sim": round(found["top_dense_sim"], 3),
+            "advice": advice,
+            "validation_problems": problems,
+            "tokens": {"in": message.usage.input_tokens, "out": message.usage.output_tokens},
+            "subset": query["subset"],
+            "n": query["n"],
+            "expected": query["expected"],
+            "should_refuse": query["expects_nothing"],
+        }
+        if not problems:
+            rows_by_n[query["n"]] = row
+            continue
+        row["retried"] = True
+        field = single_field_repair(problems)
+        repair_payload, repair_tool = request_payload(
+            query["query"], found, entry_ids, problems=problems,
+            previous=advice.get(field, advice) if field else advice,
+            field=field,
+        )
+        repairs.append((query, row, repair_payload, repair_tool, field))
+        rows_by_n[query["n"]] = row
+    if errors:
+        for line in errors:
+            print(line)
+        raise SystemExit(
+            f"{len(errors)} batch requests errored. "
+            f"{cached} successes were cached. No repair batch was submitted."
+        )
+    if repairs:
+        second = submit([
+            {"custom_id": f"repair{query['n']}", "params": payload}
+            for query, _row, payload, _tool, _field in repairs
+        ])
+        by_repair = {item.custom_id: item for item in second}
+        repair_errors = []
+        for query, row, payload, tool_name, field in repairs:
+            custom_id = f"repair{query['n']}"
+            item = by_repair.get(custom_id)
+            if item is None:
+                repair_errors.append(f"{custom_id}: missing from batch results")
+                continue
+            if item.result.type != "succeeded":
+                repair_errors.append(batch_error_line(item))
+                continue
+            message = item.result.message
+            advice = tool_input(message, tool_name)
+            if advice is None:
+                repair_errors.append(f"{custom_id}: succeeded without the tool call")
+                continue
+            store_cache(payload, tool_name, advice, message.usage.input_tokens, message.usage.output_tokens)
+            found = found_by_n[query["n"]]
+            if field:
+                row["advice"] = splice_field(row["advice"], field, scrub_dashes(advice["text"]))
+            else:
+                row["advice"] = scrub_advice(advice)
+            row["advice"] = apply_code_fields(row["advice"], found, differentials)
+            row["validation_problems"] = validate(row["advice"], found)
+            row["tokens"]["in"] += message.usage.input_tokens
+            row["tokens"]["out"] += message.usage.output_tokens
+        if repair_errors:
+            for line in repair_errors:
+                print(line)
+            raise SystemExit(f"{len(repair_errors)} repair requests errored. Successes were cached.")
+    for query in queries:
+        if query["n"] in rows_by_n:
+            results.append(rows_by_n[query["n"]])
+    return results
 
 
 def batch_error_line(item):
@@ -951,90 +1159,11 @@ def main():
             raise SystemExit("Estimate is above $0.50. Re-run with --confirm-cost to proceed. No call was made.")
 
     if args.batch:
-        requests = []
-        pending = []
-        for query in sent:
-            found = found_by_n[query["n"]]
-            payload, tool_name = request_payload(query["query"], found, entry_ids)
-            requests.append({"custom_id": f"q{query['n']}", "params": payload})
-            pending.append((query, payload, tool_name))
-        first = submit_batch(requests, live, calls)
-        repairs = []
-        errors = []
-        cached = 0
-        by_custom = {item.custom_id: item for item in first}
-        for query, payload, tool_name in pending:
-            item = by_custom.get(f"q{query['n']}")
-            if item is None:
-                errors.append(f"q{query['n']}: missing from batch results")
-                continue
-            if item.result.type != "succeeded":
-                errors.append(batch_error_line(item))
-                continue
-            message = item.result.message
-            advice = None
-            for block in message.content:
-                if block.type == "tool_use" and block.name == tool_name:
-                    advice = block.input
-            if advice is None:
-                errors.append(f"q{query['n']}: succeeded without the tool call")
-                continue
-            store_cache(
-                payload, tool_name, advice,
-                message.usage.input_tokens, message.usage.output_tokens,
-            )
-            cached += 1
-            found = found_by_n[query["n"]]
-            advice = apply_code_fields(scrub_advice(advice), found, differentials)
-            problems = validate(advice, found)
-            if not problems:
-                continue
-            field = single_field_repair(problems)
-            repair_payload, repair_tool = request_payload(
-                query["query"], found, entry_ids, problems=problems,
-                previous=advice.get(field, advice) if field else advice,
-                field=field,
-            )
-            repairs.append((f"repair{query['n']}", repair_payload, repair_tool))
-        if errors:
-            for line in errors:
-                print(line)
-            raise SystemExit(
-                f"{len(errors)} batch requests errored. "
-                f"{cached} successes were cached. No repair batch was submitted."
-            )
-        if repairs:
-            second = submit_batch(
-                [{"custom_id": custom_id, "params": payload} for custom_id, payload, _tool in repairs],
-                live, calls,
-            )
-            by_repair = {item.custom_id: item for item in second}
-            repair_errors = []
-            for custom_id, payload, tool_name in repairs:
-                item = by_repair.get(custom_id)
-                if item is None:
-                    repair_errors.append(f"{custom_id}: missing from batch results")
-                    continue
-                if item.result.type != "succeeded":
-                    repair_errors.append(batch_error_line(item))
-                    continue
-                message = item.result.message
-                advice = None
-                for block in message.content:
-                    if block.type == "tool_use" and block.name == tool_name:
-                        advice = block.input
-                if advice is None:
-                    repair_errors.append(f"{custom_id}: succeeded without the tool call")
-                    continue
-                store_cache(
-                    payload, tool_name, advice,
-                    message.usage.input_tokens, message.usage.output_tokens,
-                )
-            if repair_errors:
-                for line in repair_errors:
-                    print(line)
-                raise SystemExit(f"{len(repair_errors)} repair requests errored. Successes were cached.")
-        print(f"Anthropic requests counted against --max-calls: {calls['made']}")
+        results = run_batch(
+            queries, found_by_n, entry_ids, differentials, calls,
+            submit=lambda requests: submit_batch(requests, live, calls),
+        )
+        finish_eval(results, calls, batch=True)
         return
 
     results = []
@@ -1045,19 +1174,7 @@ def main():
         results.append(row)
         print(f"  {query['n']}", file=sys.stderr)
 
-    answered = [row for row in results if not row["refused"]]
-    refused = [row for row in results if row["refused"]]
-    should = [row for row in results if row["should_refuse"]]
-    print(f"\nAnswered: {len(answered)}   Refused: {len(refused)}")
-    print(f"Correct refusals: {sum(1 for row in should if row['refused'])}/{len(should)}")
-    print(f"False refusals: {sum(1 for row in refused if not row['should_refuse'])}")
-    print(f"Repaired on retry: {sum(1 for row in answered if row.get('retried'))}")
-    failed = [row for row in answered if row["validation_problems"]]
-    print(f"Validation failures after retry: {len(failed)}/{len(answered)}")
-    report_answer_accuracy(results)
-    dated = write_run_results(results)
-    print(f"Wrote {dated} and generation_results.json")
-    print(f"Anthropic calls this run: {calls['made']}")
+    finish_eval(results, calls, batch=False)
 
 
 if __name__ == "__main__":
