@@ -281,6 +281,7 @@ Record every run with a date. The trend is more convincing than any single score
 
 | 7 Aug 2026 | Full metric set added: MRR, NDCG, recall@k, bootstrap CIs, latency and cost. Config unchanged | 0.89 | 0.97 | 1.00 | 1.00 | 0.73 | hit@5 0.949, MRR 0.823, NDCG@5 0.837, recall@5 0.910. Eval now gated in CI |
 | 7 Aug 2026 | Extended F007 alias line with plain-language phrasings for hitting the ground before the ball | | | | | | Corpus fix, not a retrieval change. Query 1 was a vocabulary gap |
+| 24 Sep 2026 | Query 18 label correction. No change to retrieval | 0.94 | 0.97 | 1.00 | 1.00 | 0.73 | Label change, not a system change. hit@5 stayed 0.966 and hit@1 stayed 0.729. recall@5 moved from 0.927 to 0.928, MRR from 0.827 to 0.828, and NDCG@5 from 0.844 to 0.846, because R001 was already retrieved and is now counted as relevant |
 
 **Strategy comparison, 7 Aug 2026.** Same 59 answerable queries, four ways of embedding the same corpus.
 

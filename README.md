@@ -14,12 +14,12 @@ Retrieval, 59 answerable and 8 non-fault queries, 95% bootstrap confidence inter
 |---|---|---|---|
 | hit@5 | 0.966 | 0.915 to 1.000 | Correct entry in the top five results |
 | hit@1 | 0.729 | 0.610 to 0.831 | Correct entry ranked first |
-| recall@5 | 0.927 | 0.864 to 0.975 | Share of relevant entries found |
-| MRR | 0.827 | 0.746 to 0.898 | How high the first correct hit lands |
-| NDCG@5 | 0.844 | 0.771 to 0.908 | Rank-weighted quality |
+| recall@5 | 0.928 | 0.869 to 0.975 | Share of relevant entries found |
+| MRR | 0.828 | 0.749 to 0.899 | How high the first correct hit lands |
+| NDCG@5 | 0.846 | 0.774 to 0.908 | Rank-weighted quality |
 | Abstention | 1.000 | | 8 of 8, zero false declines |
 
-**hit@5 and hit@1 are different claims.** hit@5 of 0.966 means the correct entry appeared somewhere in the top five, not that the tool gave the right answer. The number for ranking it first is hit@1 at 0.729. MRR of 0.827 sitting close to hit@1 means that when the right entry is not first it is almost always second.
+**hit@5 and hit@1 are different claims.** hit@5 of 0.966 means the correct entry appeared somewhere in the top five, not that the tool gave the right answer. The number for ranking it first is hit@1 at 0.729. MRR of 0.828 sitting close to hit@1 means that when the right entry is not first it is almost always second.
 
 Generation, richer-answer baseline: 59 answered, 8 of 8 correct refusals, 0 false refusals, and 0 validation failures after repair. The first attempt needed repair on 18 answers. Answers averaged 68.6 words, reached 98 at most, and 39 of 59 included setup steps. The full run used 293,324 input and 20,385 output tokens, about $1.20.
 
