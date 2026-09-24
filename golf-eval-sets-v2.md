@@ -222,6 +222,7 @@ Retrieval finds entries. Generation turns them into one piece of advice. Scored 
 | Follow-up is code | "If it keeps happening" is the differential table's test text, shown only when a confusable was retrieved. Rows apply in both directions | The model no longer writes this field, so it cannot satisfy two rules at once |
 | Sources are code | Built from every entry ID the answer used | The model does not invent the citation list |
 | Fit was removed | The model used to report clear, ambiguous, or none | It never fired in testing, including on the two known retrieval misses, so the model's own judgement of fit is not relied on. Retrieval-side miss signals are being evaluated instead |
+| Miss signal not wired | Disagreement, a fused gap of at most 0.005, and dense similarity of at most 0.50 caught queries 13 and 24 | The same rule also flagged 12 correct queries. Passing 7 entries covers both misses, so the rule is not wired in |
 | Key thought for decisions | S and C entries label the headline Key thought | A strategy or conditions cue is not a swing cue |
 | Follow-up diagnosis is grounded | Differential rows are parsed from corpus notes at runtime, with compensation risk as fallback | Keeps uncertainty useful without indexing the notes |
 
@@ -289,6 +290,7 @@ Record every run with a date. The trend is more convincing than any single score
 | 24 Sep 2026 | Query 18 label correction. No change to retrieval | 0.94 | 0.97 | 1.00 | 1.00 | 0.73 | Label change, not a system change. hit@5 stayed 0.966 and hit@1 stayed 0.729. recall@5 moved from 0.927 to 0.928, MRR from 0.827 to 0.828, and NDCG@5 from 0.844 to 0.846, because R001 was already retrieved and is now counted as relevant |
 | 24 Sep 2026 | Review corpus fixes: F012 tee height split into a setup step, F009 ball-position fix scoped to wedges and short irons, C002 no longer says wind adds spin, L004 states why downhill contact is difficult | 0.94 | 0.97 | 1.00 | 1.00 | 0.73 | Wording fixes, found by reading answers. hit@5 0.966, hit@1 0.729 and recall@5 0.928 unchanged. MRR moved from 0.828 to 0.825 and NDCG@5 from 0.846 to 0.844. The same two queries still miss |
 | 24 Sep 2026 | Differential tests rewritten in plain language with no entry codes | 0.94 | 0.97 | 1.00 | 1.00 | 0.73 | The table is not indexed. hit@5 0.966, hit@1 0.729, recall@5 0.928, MRR 0.825, NDCG@5 0.844, abstention 1.000. Nothing moved. Code now shows this text directly to the golfer |
+| 24 Sep 2026 | Pass 7 entries to the model. No top-1 guarantee, RRF k 60 | 0.94 | 0.97 | 1.00 | 1.00 | 0.73 | hit@5 stays 0.966 and hit@1 stays 0.729. hit@7 is 1.000. The configuration was chosen by sweeping against this same eval set, so the gain is measured on the queries used to choose it. Passing more candidates is a structural change rather than a tuned parameter, which limits the overfitting risk |
 
 **Strategy comparison, 7 Aug 2026.** Same 59 answerable queries, four ways of embedding the same corpus.
 

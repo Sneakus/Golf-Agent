@@ -196,7 +196,7 @@ class Retriever:
         self.e_vecs = embed(self.texts)
         self.ids = [e["id"] for e in self.entries]
 
-    def search(self, query, k=5, q_vec=None, rrf_k=60, top1_guarantee=False):
+    def search(self, query, k=7, q_vec=None, rrf_k=60, top1_guarantee=False):
         if q_vec is None:
             q_vec = embed([query])[0]
         dense = self.e_vecs @ q_vec
@@ -334,7 +334,7 @@ def cache_key(payload):
 
 
 def retrieval_config_hash(corpus_paths):
-    parts = ["alias_weighted", "rrf=60", "k=5", "top1_guarantee=off"]
+    parts = ["alias_weighted", "rrf=60", "k=7", "top1_guarantee=off"]
     for path in corpus_paths:
         parts.append(hashlib.sha256(Path(path).read_bytes()).hexdigest())
     return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
@@ -712,15 +712,16 @@ def print_answer(answer_row, plain=False):
             print(f"    - {problem}")
 
 
-def estimate_cost(saved_path, numbers, batch=False):
+def estimate_cost(saved_path, numbers, batch=False, passed=7, saved_passed=5):
+    """Scale input tokens from the saved 5-entry runs to the live passed count."""
     saved = json.loads(Path(saved_path).read_text(encoding="utf-8"))
     rows = [row for row in saved if row.get("n") in numbers and row.get("tokens")]
-    incoming = sum(row["tokens"]["in"] for row in rows)
+    incoming = sum(row["tokens"]["in"] for row in rows) * passed / saved_passed
     outgoing = sum(row["tokens"]["out"] for row in rows)
     cost = incoming * INPUT_USD_PER_TOKEN + outgoing * OUTPUT_USD_PER_TOKEN
     if batch:
         cost *= 0.5
-    return cost, incoming, outgoing, len(rows)
+    return cost, int(incoming), outgoing, len(rows)
 
 
 def write_snapshot(retriever, queries, corpus_paths):
@@ -728,8 +729,9 @@ def write_snapshot(retriever, queries, corpus_paths):
         "config_hash": retrieval_config_hash(corpus_paths),
         "queries": [],
     }
-    for query in queries:
-        found = retriever.search(query["query"])
+    q_vecs = embed([query["query"] for query in queries])
+    for query, q_vec in zip(queries, q_vecs):
+        found = retriever.search(query["query"], q_vec=q_vec)
         payload["queries"].append({
             "n": query["n"],
             "query": query["query"],
@@ -897,10 +899,42 @@ def main():
 
     if args.batch:
         requests = []
+        pending = []
         for query in queries:
-            payload, _tool = request_payload(query["query"], found_by_n[query["n"]], entry_ids)
+            found = found_by_n[query["n"]]
+            refusal = decide_refusal(found)
+            if refusal["refused"]:
+                continue
+            payload, _tool = request_payload(query["query"], found, entry_ids)
             requests.append({"custom_id": f"q{query['n']}", "params": payload})
-        submit_batch(requests, live, calls)
+            pending.append(query)
+        first = submit_batch(requests, live, calls)
+        repairs = []
+        by_custom = {item.custom_id: item for item in first}
+        for query in pending:
+            item = by_custom[f"q{query['n']}"]
+            if item.result.type != "succeeded":
+                raise RuntimeError(f"Batch request q{query['n']} ended as {item.result.type}")
+            message = item.result.message
+            advice = None
+            for block in message.content:
+                if block.type == "tool_use":
+                    advice = block.input
+            found = found_by_n[query["n"]]
+            advice = apply_code_fields(scrub_advice(advice), found, differentials)
+            problems = validate(advice, found)
+            if not problems:
+                continue
+            field = single_field_repair(problems)
+            payload, _tool = request_payload(
+                query["query"], found, entry_ids, problems=problems,
+                previous=advice.get(field, advice) if field else advice,
+                field=field,
+            )
+            repairs.append({"custom_id": f"repair{query['n']}", "params": payload})
+        if repairs:
+            submit_batch(repairs, live, calls)
+        print(f"Anthropic requests counted against --max-calls: {calls['made']}")
         return
 
     results = []

@@ -141,6 +141,14 @@ def report(rows, abst, k, mode, embed_tokens):
         }[m]
         print(f"{m:<12} {mean:>7.3f}   [{lo:.3f}, {hi:.3f}]   {note}")
 
+    if k > 5 and rows:
+        vals = [0.0 if r["declined"] else float(any(
+            doc in set(r["expected"]) for doc in r["ranked"][:5])) for r in rows]
+        mean = sum(vals) / len(vals)
+        lo, hi = bootstrap_ci(vals)
+        summary["hit@5"] = {"score": round(mean, 3), "ci": [round(lo, 3), round(hi, 3)]}
+        print(f"{'hit@5':<12} {mean:>7.3f}   [{lo:.3f}, {hi:.3f}]   right entry in top 5")
+
     correct = sum(a["correct"] for a in abst)
     print(f"{'abstention':<12} {correct/len(abst):>7.3f}   {'':>16}   "
           f"{correct}/{len(abst)} correctly declined")
