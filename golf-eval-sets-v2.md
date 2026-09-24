@@ -90,12 +90,14 @@ Paraphrased from real forum posts. These use the outcome-and-feeling language go
 
 | # | Query | Expected |
 |---|---|---|
-| 35 | left every putt short all day, kept leaving it on the front lip | P001 |
+| 35 | left every putt short all day, kept leaving it on the front lip | P001, P006 |
 | 36 | kept blowing putts 4 feet past and missing the one back | P002 |
 | 37 | read it to break left, it broke right, misread it completely | P003 |
 | 38 | got the line right but the pace was so wrong the break never took | P004 |
 | 39 | yanked a couple of short putts left, pushed one right, no idea which way theyre going | P005 |
 | 40 | greens were lightning today, three-putted loads, never got the speed all round | P006 |
+
+**Query 35.** The query describes short putts on every green all day, which the corpus's own differential table assigns to green speed (P006). P001 stays accepted.
 
 ### Distance, strategy and conditions
 
@@ -239,7 +241,8 @@ This is a new baseline, not a continuation of the earlier generation results. Th
 | 24 Sep 2026 | Answer-level accuracy on the saved richer-answer run | | | | | | | | 55 of 59 (93%), 95% CI 0.864 to 0.983, as originally labelled. Of the 57 queries where retrieval placed the correct entry in the top five, the answer chose it in 55. After the query 18 correction, 56 of 59 (95%), 95% CI 0.881 to 1.000, which is 56 of those same 57. R001 was added to the corpus after query 18 was labelled and covers exactly this kind of recovery shot. Query 17 was already relabelled to R001 at the time; 18 was missed. This run predates the L001 fixes. Not a generation rerun. |
 | 24 Sep 2026 | Live test of queries 14, 45 and 56 with seven entries, strict tool use and temperature 0 | | | 0 after repair | 2 repairs across the three queries | | | | Query 56 passed on the first pass. Query 45 chose S002 over the expected S001. The S001 label was left unchanged. Replayed from the cache with live mode off. |
 | 24 Sep 2026 | Grip check corrected to match its own rule | | | | | | | | The check rejected any setup step containing "grip" unless it said "grip down". The rule is that a structural grip change, such as strengthening, weakening, or turning the hands on the grip, is not a next-shot step. Holding the club nearer the end is a setup adjustment about where the club is held, correct for a ball below the feet, just as gripping down is correct for a ball above them. The check now rejects only grip strength and how the hands sit on the grip. This is a correction, not a loosening. The 15-word limit and the content check are unchanged. The prompt now also tells the model to shorten a Fixes or Adjustments line that is longer than 15 words while keeping its key words. |
-| 24 Sep 2026 | Full batch baseline. Seven entries, strict tools, temperature 0 | 8/8 | 0 | 0 after repair | 8/59 | | | 242,192 input, 11,866 output, about $0.45 at batch half price | 54 of 59 (92%). The previous full run, after the query 18 label correction, was 56 of 59, with mismatches 13, 16 and 24. Queries 13 and 24 are now correct. Queries 3, 35, 45 and 51 were correct then and are not now. Query 16 stayed incorrect. |
+| 24 Sep 2026 | Full batch baseline. Seven entries, strict tools, temperature 0 | 8/8 | 0 | 0 after repair | 8/59 | | | 242,192 input, 11,866 output, about $0.45 at batch half price | 54 of 59 (92%). The previous full run, after the query 18 label correction, was 56 of 59, with mismatches 13, 16 and 24. Queries 13 and 24 are now correct. Queries 3, 35, 45 and 51 were correct then and are not now. Query 16 stayed incorrect. Manual review of this batch: 44 of 59 fully correct, 12 flawed and 3 wrong, up from 31 of 57, 21 and 5. |
+| 25 Sep 2026 | Start-direction and distance guards, tee-shot follow-up, grip lines not selectable, shorter prompt targets, F009 driver fixes, query 35 accepts P006 | | | | | | | | Answer-level accuracy on the saved batch is 54 of 59 (91.5%), 95% CI 0.831 to 0.983, as originally labelled, and 55 of 59 (93.2%), 95% CI 0.864 to 0.983, after accepting P006 on query 35. The query describes short putts on every green all day, which the differential table assigns to green speed. The start-direction guard flags queries 3 and 13. The distance guard flags query 16. Nothing else. On a tee shot, driver, drive or drives, a differential row that involves L001 to L006 is skipped. That removes the lie follow-up from saved answers 4 and 23. Retrieval after the F009 lines: hit@5 stays 0.966. hit@1 moves from 0.729 to 0.746. The same two misses remain, queries 13 and 24. Not a generation rerun. |
 
 ## Earlier answer format results, 7 Aug 2026
 

@@ -234,6 +234,8 @@ Every entry has the same fields:
 **Fixes**
 - Same as F008.
 - With wedges and short irons, check that ball position has not crept back in the stance.
+- With a driver, tee it so half the ball sits above the clubhead.
+- With a driver or wood, sweep level through the ball rather than hitting down.
 
 **Evidence tier:** settled
 

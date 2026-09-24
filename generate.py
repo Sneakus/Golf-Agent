@@ -149,15 +149,15 @@ Rules, in order of importance:
 3. Each setup step points at one Fixes or Adjustments line. Set entry_id and fix_index
    to that line. Word text closely to that line so it can be traced back to it. If that
    line is longer than 15 words, shorten it to 15 words or fewer while keeping its key
-   words. Include only something the golfer can do in the next 30 seconds without
+   words. Aim for about 12 words. Include only something the golfer can do in the next 30 seconds without
    practice: aim, ball position, stance, where the club is held, or club choice. A
    structural grip change is not a setup step. That means grip strength, or how the hands
    sit on the grip, such as strengthening, weakening, or turning the hands. Where the club
    is held is allowed, including gripping down and holding it nearer the end when the
    entry says so. Skip lines that only point at another entry. Return none when no step
    fits. Never pad the list or repeat the swing thought as a setup step.
-4. Describe the swing thought's intended effect, not the body part. "Feel the club brush the grass after
-   the ball" not "shift your weight forward and keep your chest down".
+4. Describe the swing thought's intended effect, not the body part. Aim for about 12 words.
+   "Feel the club brush the grass after the ball" not "shift your weight forward and keep your chest down".
 5. Plain words. Never use these terms, use the plain version instead:
      low point            -> where the club reaches the bottom of its arc
      attack angle         -> how steeply you are swinging down
@@ -169,15 +169,16 @@ Rules, in order of importance:
 7. Use commas or full stops instead of em dashes or en dashes. Plain hyphens are fine.
 8. Respect every field's hard word limit. Keep the whole answer at 140 words or fewer,
    excluding sources. Aim below each limit so punctuation and contractions cannot put the
-   answer over. What happened is exactly one sentence. Write Why as exactly one sentence
+   answer over. What happened is exactly one sentence of about 16 words. Write Why as exactly one sentence
    of at most 20 words; the absolute validator allows no more than two sentences and 30 words.
 9. Only state causes the golfer's description supports. Do not infer start direction, ground
    contact, deceleration or any other detail the golfer did not mention.
 10. Never stretch an entry to fit, and never state anything that contradicts the entry or
     the ball flight laws.
-11. Setup steps must fit the golfer's miss and club. If a fix is scoped to certain clubs or
-    situations, do not apply it outside them. Never recommend a step that would make the
-    described miss worse, such as more club when the ball went too far.
+11. Setup steps and the swing thought must fit the golfer's miss and club. If a fix is scoped
+    to certain clubs or situations, do not apply it outside them. Never recommend a step that
+    would make the described miss worse, such as more club when the ball went too far. With a
+    driver, or a wood from the tee, never cue brushing or hitting the ground.
 12. "Why" must use the entry's own explanation. If the entry gives none, keep to what it
     states and do not add a mechanism.
 13. For strategy (S) and conditions (C) entries, the headline can be a decision or target
@@ -318,6 +319,22 @@ SNAPSHOT_PATH = Path("retrieval_snapshot.json")
 INPUT_USD_PER_TOKEN = 3 / 1_000_000
 OUTPUT_USD_PER_TOKEN = 15 / 1_000_000
 POINTER_RE = re.compile(r"^\s*same as\b", re.I)
+START_DIRECTION_RE = re.compile(
+    r"\b(?:starts?|started|starting|push(?:ed)?|pull(?:ed)?|block(?:ed)?|yank(?:ed)?)\b",
+    re.I,
+)
+LIE_RE = re.compile(r"L00[1-6]")
+TEE_SHOT_RE = re.compile(r"\b(?:tee|driver|drives?)\b", re.I)
+SHORT_EVIDENCE = (
+    "didn't reach", "didnt reach", "never reached", "underpowered", "underhit", "short",
+)
+LONG_EVIDENCE = (
+    "over the back", "through the back", "flew the green", "overpowered", "overhit", "past", "long",
+)
+START_DIRECTION_MSG = (
+    "diagnosis assumes a start direction the golfer did not give; "
+    "diagnose F001 and let the follow-up ask where it started"
+)
 STRUCTURAL_GRIP_RE = re.compile(
     r"\b(?:strengthen(?:ing)?|weaken(?:ing)?|stronger|weaker)\b(?:\W+\w+){0,6}\W+\bgrip\b"
     r"|\bgrip\b(?:\W+\w+){0,4}\W+\b(?:stronger|weaker|strength)\b"
@@ -388,7 +405,38 @@ def scrub_advice(advice):
     return advice
 
 
-def followup_text(entry_id, retrieved_ids, differentials):
+def has_evidence(query, phrases):
+    text = query or ""
+    return any(re.search(r"\b" + re.escape(phrase) + r"\b", text, re.I) for phrase in phrases)
+
+
+def start_direction_problem(entry_id, query):
+    if entry_id not in {"F002", "F003"}:
+        return None
+    if START_DIRECTION_RE.search(query or ""):
+        return None
+    return START_DIRECTION_MSG
+
+
+def distance_direction_problem(entry_id, query):
+    short = has_evidence(query, SHORT_EVIDENCE)
+    long = has_evidence(query, LONG_EVIDENCE)
+    if entry_id in {"P002", "D004"} and short and not long:
+        return "diagnosis assumes the ball went long when the golfer said it came up short"
+    if entry_id in {"P001", "D003"} and long and not short:
+        return "diagnosis assumes the ball came up short when the golfer said it went long"
+    return None
+
+
+def tee_shot(query):
+    return TEE_SHOT_RE.search(query or "") is not None
+
+
+def row_involves_lie(parties):
+    return any(LIE_RE.fullmatch(item) for item in parties)
+
+
+def followup_text(entry_id, retrieved_ids, differentials, query=""):
     """Exact differential test. Rows apply in both directions. No compensation path."""
     rank = {entry: i for i, entry in enumerate(retrieved_ids)}
     best = None
@@ -400,6 +448,8 @@ def followup_text(entry_id, retrieved_ids, differentials):
         parties = [primary, *row["confused_ids"]]
         if entry_id not in parties:
             continue
+        if tee_shot(query) and row_involves_lie(parties):
+            continue
         others = [item for item in parties if item != entry_id and item in rank]
         if not others:
             continue
@@ -410,8 +460,8 @@ def followup_text(entry_id, retrieved_ids, differentials):
     return best[1] if best else ""
 
 
-def apply_code_fields(advice, result, differentials):
-    text = followup_text(advice["entry_id"], result["ids"], differentials)
+def apply_code_fields(advice, result, differentials, query=""):
+    text = followup_text(advice["entry_id"], result["ids"], differentials, query)
     advice["if_it_keeps_happening"] = text
     used = [advice["entry_id"]]
     used.extend(step["entry_id"] for step in advice.get("setup_steps") or [])
@@ -469,7 +519,7 @@ def single_field_repair(problems):
     return None
 
 
-def validate(advice, result):
+def validate(advice, result, query=""):
     problems = []
     limits = {"what_happened": 20, "swing_thought": 15, "why": 30}
     for field, text in model_fields(advice):
@@ -510,8 +560,8 @@ def validate(advice, result):
             problems.append(f"setup_steps[{i}] fix_index is not a line in {source_id}")
             continue
         line = fixes[index]
-        if POINTER_RE.match(line):
-            problems.append(f"setup_steps[{i}] points at a line that only refers elsewhere")
+        if POINTER_RE.match(line) or structural_grip_change(line):
+            problems.append(f"setup_steps[{i}] points at a line that is not a setup step")
             continue
         if not (content_words(step.get("text", "")) & content_words(line)):
             problems.append(
@@ -519,6 +569,12 @@ def validate(advice, result):
             )
         if structural_grip_change(step.get("text", "")):
             problems.append(f"setup_steps[{i}] changes grip strength or how the hands sit on the grip")
+    direction = start_direction_problem(advice.get("entry_id"), query)
+    if direction:
+        problems.append(direction)
+    distance = distance_direction_problem(advice.get("entry_id"), query)
+    if distance:
+        problems.append(distance)
     total = sum(word_count(text) for _, text in model_fields(advice))
     total += word_count(advice.get("if_it_keeps_happening", ""))
     if total > 140:
@@ -639,8 +695,8 @@ def answer(query, result, differentials, entry_ids, live=False, stub=None, calls
                 "top_dense_sim": round(result["top_dense_sim"], 3)}
     payload, tool_name = request_payload(query, result, entry_ids)
     advice, usage, _called = complete(payload, tool_name, live, stub, calls)
-    advice = apply_code_fields(scrub_advice(advice), result, differentials)
-    problems = validate(advice, result)
+    advice = apply_code_fields(scrub_advice(advice), result, differentials, query)
+    problems = validate(advice, result, query)
     retried = False
     if problems:
         retried = True
@@ -659,8 +715,8 @@ def answer(query, result, differentials, entry_ids, live=False, stub=None, calls
             advice = scrub_advice(advice)
         usage.input_tokens += usage2.input_tokens
         usage.output_tokens += usage2.output_tokens
-        advice = apply_code_fields(advice, result, differentials)
-        problems = validate(advice, result)
+        advice = apply_code_fields(advice, result, differentials, query)
+        problems = validate(advice, result, query)
     return {
         "retried": retried,
         "query": query,
@@ -1005,8 +1061,8 @@ def run_batch(queries, found_by_n, entry_ids, differentials, calls, submit):
         if not from_cache:
             store_cache(payload, tool_name, advice, usage_in, usage_out)
         found = found_by_n[query["n"]]
-        advice = apply_code_fields(scrub_advice(advice), found, differentials)
-        problems = validate(advice, found)
+        advice = apply_code_fields(scrub_advice(advice), found, differentials, query["query"])
+        problems = validate(advice, found, query["query"])
         row = {
             "retried": False,
             "query": query["query"],
@@ -1098,8 +1154,8 @@ def run_batch(queries, found_by_n, entry_ids, differentials, calls, submit):
                 row["advice"] = splice_field(row["advice"], field, scrub_dashes(advice["text"]))
             else:
                 row["advice"] = scrub_advice(advice)
-            row["advice"] = apply_code_fields(row["advice"], found, differentials)
-            row["validation_problems"] = validate(row["advice"], found)
+            row["advice"] = apply_code_fields(row["advice"], found, differentials, query["query"])
+            row["validation_problems"] = validate(row["advice"], found, query["query"])
             row["tokens"]["in"] += usage_in
             row["tokens"]["out"] += usage_out
         if repair_errors:
