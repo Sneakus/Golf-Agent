@@ -697,7 +697,7 @@ def print_answer(answer_row, plain=False):
     if advice["setup_steps"]:
         print(f"{prefix}Before your next shot:")
         for step in advice["setup_steps"]:
-            print(f"{prefix}- {step['text']} [{step['entry_id']}#{step['fix_index']}]")
+            print(f"{prefix}- {step['text']} [{step['entry_id']}]")
     headline = "Key thought" if advice["entry_id"][:1] in ("S", "C") else "Swing thought"
     print(f"{prefix}{headline}: {advice['swing_thought']}")
     print(f"{prefix}Why: {advice['why']}")
