@@ -146,12 +146,15 @@ Rules, in order of importance:
 2. ONE swing thought. Never two. Setup steps happen before address, so they do not
    compete with the swing thought. The one-thought limit applies to the swing only.
 3. Each setup step points at one Fixes or Adjustments line. Set entry_id and fix_index
-   to that line. Word text closely to that line so it can be traced back to it. Include
-   only something the golfer can do in the next 30 seconds without practice: aim, ball
-   position, stance, gripping down the club, or club choice. A structural grip change is
-   not a setup step. Only include grip position when the entry says to grip down, not when
-   it says to grip nearer the end. Skip lines that only point at another entry. Return none
-   when no step fits. Never pad the list or repeat the swing thought as a setup step.
+   to that line. Word text closely to that line so it can be traced back to it. If that
+   line is longer than 15 words, shorten it to 15 words or fewer while keeping its key
+   words. Include only something the golfer can do in the next 30 seconds without
+   practice: aim, ball position, stance, where the club is held, or club choice. A
+   structural grip change is not a setup step. That means grip strength, or how the hands
+   sit on the grip, such as strengthening, weakening, or turning the hands. Where the club
+   is held is allowed, including gripping down and holding it nearer the end when the
+   entry says so. Skip lines that only point at another entry. Return none when no step
+   fits. Never pad the list or repeat the swing thought as a setup step.
 4. Describe the swing thought's intended effect, not the body part. "Feel the club brush the grass after
    the ball" not "shift your weight forward and keep your chest down".
 5. Plain words. Never use these terms, use the plain version instead:
@@ -314,6 +317,18 @@ SNAPSHOT_PATH = Path("retrieval_snapshot.json")
 INPUT_USD_PER_TOKEN = 3 / 1_000_000
 OUTPUT_USD_PER_TOKEN = 15 / 1_000_000
 POINTER_RE = re.compile(r"^\s*same as\b", re.I)
+STRUCTURAL_GRIP_RE = re.compile(
+    r"\b(?:strengthen(?:ing)?|weaken(?:ing)?|stronger|weaker)\b(?:\W+\w+){0,6}\W+\bgrip\b"
+    r"|\bgrip\b(?:\W+\w+){0,4}\W+\b(?:stronger|weaker|strength)\b"
+    r"|\b(?:turn|rotate|roll)\b(?:\W+\w+){0,8}\W+\bhands?\b(?:\W+\w+){0,8}\W+\bgrip\b"
+    r"|\bhands?\b(?:\W+\w+){0,8}\W+\bon the grip\b",
+    re.I,
+)
+
+
+def structural_grip_change(text):
+    """Grip strength or hand position on the grip. Where the club is held is allowed."""
+    return STRUCTURAL_GRIP_RE.search(text or "") is not None
 FIELD_LIMIT_RE = re.compile(
     r"^(what_happened|swing_thought|why|setup_steps\[\d+\]\.text) is \d+ words"
 )
@@ -501,8 +516,8 @@ def validate(advice, result):
             problems.append(
                 f"setup_steps[{i}] does not match fix line {index} of {source_id}"
             )
-        if "grip" in step.get("text", "").lower() and "grip down" not in step.get("text", "").lower():
-            problems.append(f"setup_steps[{i}] changes the grip without gripping down")
+        if structural_grip_change(step.get("text", "")):
+            problems.append(f"setup_steps[{i}] changes grip strength or how the hands sit on the grip")
     total = sum(word_count(text) for _, text in model_fields(advice))
     total += word_count(advice.get("if_it_keeps_happening", ""))
     if total > 140:
