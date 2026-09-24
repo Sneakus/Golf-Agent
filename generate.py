@@ -25,6 +25,7 @@ Usage:
 
 import argparse
 import contextlib
+from datetime import datetime
 import hashlib
 import io
 import json
@@ -566,7 +567,7 @@ def request_payload(query, result, entry_ids, problems=None, previous=None, fiel
         "tools": [schema],
         "tool_choice": {"type": "tool", "name": tool_name},
         "messages": [{"role": "user", "content": user}],
-        "extra_body": {"temperature": 0},
+        "temperature": 0,
     }, tool_name
 
 
@@ -574,6 +575,17 @@ class Usage:
     def __init__(self, input_tokens=0, output_tokens=0):
         self.input_tokens = input_tokens
         self.output_tokens = output_tokens
+
+
+def store_cache(payload, tool_name, advice, usage_in, usage_out):
+    key = cache_key({"payload": payload, "tool": tool_name})
+    path = CACHE_DIR / f"{key}.json"
+    CACHE_DIR.mkdir(exist_ok=True)
+    path.write_text(json.dumps({
+        "advice": advice,
+        "usage": {"in": usage_in, "out": usage_out},
+    }), encoding="utf-8")
+    return path
 
 
 def complete(payload, tool_name, live, stub, calls):
@@ -593,7 +605,12 @@ def complete(payload, tool_name, live, stub, calls):
         raise SystemExit(f"Call cap of {calls['max']} reached. No further Anthropic call was made.")
     import anthropic
     client = anthropic.Anthropic()
-    response = client.messages.create(**payload)
+    sdk_payload = dict(payload)
+    temperature = sdk_payload.pop("temperature", None)
+    response = client.messages.create(
+        **sdk_payload,
+        extra_body={"temperature": temperature} if temperature is not None else None,
+    )
     calls["made"] += 1
     advice = None
     for block in response.content:
@@ -601,11 +618,7 @@ def complete(payload, tool_name, live, stub, calls):
             advice = block.input
     if advice is None:
         raise RuntimeError("Model did not return the tool call")
-    CACHE_DIR.mkdir(exist_ok=True)
-    path.write_text(json.dumps({
-        "advice": advice,
-        "usage": {"in": response.usage.input_tokens, "out": response.usage.output_tokens},
-    }), encoding="utf-8")
+    store_cache(payload, tool_name, advice, response.usage.input_tokens, response.usage.output_tokens)
     return advice, Usage(response.usage.input_tokens, response.usage.output_tokens), True
 
 
@@ -725,16 +738,28 @@ def print_answer(answer_row, plain=False):
             print(f"    - {problem}")
 
 
-def estimate_cost(saved_path, numbers, batch=False, passed=7, saved_passed=5):
-    """Scale input tokens from the saved 5-entry runs to the live passed count."""
+def estimate_cost(saved_path, n_queries, batch=False):
+    """Average saved cost per answer, times the queries in this run, plus a repair allowance."""
     saved = json.loads(Path(saved_path).read_text(encoding="utf-8"))
-    rows = [row for row in saved if row.get("n") in numbers and row.get("tokens")]
-    incoming = sum(row["tokens"]["in"] for row in rows) * passed / saved_passed
-    outgoing = sum(row["tokens"]["out"] for row in rows)
-    cost = incoming * INPUT_USD_PER_TOKEN + outgoing * OUTPUT_USD_PER_TOKEN
+    rows = [row for row in saved if row.get("tokens") and not row.get("refused")]
+    if not rows or n_queries <= 0:
+        return 0.0, "no saved answers with token counts"
+    average = sum(
+        row["tokens"]["in"] * INPUT_USD_PER_TOKEN + row["tokens"]["out"] * OUTPUT_USD_PER_TOKEN
+        for row in rows
+    ) / len(rows)
+    repaired = sum(1 for row in rows if row.get("retried"))
+    rate = repaired / len(rows)
+    cost = average * n_queries * (1 + rate)
     if batch:
         cost *= 0.5
-    return cost, int(incoming), outgoing, len(rows)
+    basis = (
+        f"average of {len(rows)} saved answers (${average:.4f} each) "
+        f"times {n_queries} {'query' if n_queries == 1 else 'queries'} in this run, "
+        f"plus a repair allowance of {repaired}/{len(rows)}"
+        + (" at batch half price" if batch else "")
+    )
+    return cost, basis
 
 
 def write_snapshot(retriever, queries, corpus_paths):
@@ -821,6 +846,23 @@ def run_stub():
     print_answer(finished, plain=True)
 
 
+def write_run_results(results):
+    text = json.dumps(results, indent=2)
+    stamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    dated = Path(f"generation_results-{stamp}.json")
+    dated.write_text(text, encoding="utf-8")
+    Path("generation_results.json").write_text(text, encoding="utf-8")
+    return dated
+
+
+def batch_error_line(item):
+    result = item.result
+    if result.type == "errored":
+        err = result.error.error
+        return f"{item.custom_id}: {err.type}: {err.message}"
+    return f"{item.custom_id}: {result.type}"
+
+
 def submit_batch(requests, live, calls):
     """Message Batches API at half price. Not run unless --batch is passed."""
     if not live:
@@ -895,58 +937,103 @@ def main():
         queries = [query for query in queries if query["n"] in wanted]
     if args.limit:
         queries = queries[: args.limit]
-    numbers = [query["n"] for query in queries]
-    if live and Path(args.saved_results).exists():
-        cost, incoming, outgoing, counted = estimate_cost(args.saved_results, set(numbers), batch=args.batch)
-        print(f"Estimated cost: ${cost:.2f} from {counted} saved answers "
-              f"({incoming:,} in, {outgoing:,} out)"
-              + (" at batch half price" if args.batch else ""))
-        if cost > 0.50 and not args.confirm_cost:
-            raise SystemExit("Estimate is above $0.50. Re-run with --confirm-cost to proceed. No call was made.")
-
     if args.fresh_retrieval:
         found_by_n = {query["n"]: retriever.search(query["query"]) for query in queries}
     else:
         snapshot = load_snapshot(args.corpus)
         found_by_n = {query["n"]: result_from_snapshot(snapshot[query["n"]], by_id) for query in queries}
 
+    sent = [query for query in queries if not decide_refusal(found_by_n[query["n"]])["refused"]]
+    if live and Path(args.saved_results).exists():
+        cost, basis = estimate_cost(args.saved_results, len(sent), batch=args.batch)
+        print(f"Estimated cost: ${cost:.2f}. Basis: {basis}")
+        if cost > 0.50 and not args.confirm_cost:
+            raise SystemExit("Estimate is above $0.50. Re-run with --confirm-cost to proceed. No call was made.")
+
     if args.batch:
         requests = []
         pending = []
-        for query in queries:
+        for query in sent:
             found = found_by_n[query["n"]]
-            refusal = decide_refusal(found)
-            if refusal["refused"]:
-                continue
-            payload, _tool = request_payload(query["query"], found, entry_ids)
+            payload, tool_name = request_payload(query["query"], found, entry_ids)
             requests.append({"custom_id": f"q{query['n']}", "params": payload})
-            pending.append(query)
+            pending.append((query, payload, tool_name))
         first = submit_batch(requests, live, calls)
         repairs = []
+        errors = []
+        cached = 0
         by_custom = {item.custom_id: item for item in first}
-        for query in pending:
-            item = by_custom[f"q{query['n']}"]
+        for query, payload, tool_name in pending:
+            item = by_custom.get(f"q{query['n']}")
+            if item is None:
+                errors.append(f"q{query['n']}: missing from batch results")
+                continue
             if item.result.type != "succeeded":
-                raise RuntimeError(f"Batch request q{query['n']} ended as {item.result.type}")
+                errors.append(batch_error_line(item))
+                continue
             message = item.result.message
             advice = None
             for block in message.content:
-                if block.type == "tool_use":
+                if block.type == "tool_use" and block.name == tool_name:
                     advice = block.input
+            if advice is None:
+                errors.append(f"q{query['n']}: succeeded without the tool call")
+                continue
+            store_cache(
+                payload, tool_name, advice,
+                message.usage.input_tokens, message.usage.output_tokens,
+            )
+            cached += 1
             found = found_by_n[query["n"]]
             advice = apply_code_fields(scrub_advice(advice), found, differentials)
             problems = validate(advice, found)
             if not problems:
                 continue
             field = single_field_repair(problems)
-            payload, _tool = request_payload(
+            repair_payload, repair_tool = request_payload(
                 query["query"], found, entry_ids, problems=problems,
                 previous=advice.get(field, advice) if field else advice,
                 field=field,
             )
-            repairs.append({"custom_id": f"repair{query['n']}", "params": payload})
+            repairs.append((f"repair{query['n']}", repair_payload, repair_tool))
+        if errors:
+            for line in errors:
+                print(line)
+            raise SystemExit(
+                f"{len(errors)} batch requests errored. "
+                f"{cached} successes were cached. No repair batch was submitted."
+            )
         if repairs:
-            submit_batch(repairs, live, calls)
+            second = submit_batch(
+                [{"custom_id": custom_id, "params": payload} for custom_id, payload, _tool in repairs],
+                live, calls,
+            )
+            by_repair = {item.custom_id: item for item in second}
+            repair_errors = []
+            for custom_id, payload, tool_name in repairs:
+                item = by_repair.get(custom_id)
+                if item is None:
+                    repair_errors.append(f"{custom_id}: missing from batch results")
+                    continue
+                if item.result.type != "succeeded":
+                    repair_errors.append(batch_error_line(item))
+                    continue
+                message = item.result.message
+                advice = None
+                for block in message.content:
+                    if block.type == "tool_use" and block.name == tool_name:
+                        advice = block.input
+                if advice is None:
+                    repair_errors.append(f"{custom_id}: succeeded without the tool call")
+                    continue
+                store_cache(
+                    payload, tool_name, advice,
+                    message.usage.input_tokens, message.usage.output_tokens,
+                )
+            if repair_errors:
+                for line in repair_errors:
+                    print(line)
+                raise SystemExit(f"{len(repair_errors)} repair requests errored. Successes were cached.")
         print(f"Anthropic requests counted against --max-calls: {calls['made']}")
         return
 
@@ -968,7 +1055,8 @@ def main():
     failed = [row for row in answered if row["validation_problems"]]
     print(f"Validation failures after retry: {len(failed)}/{len(answered)}")
     report_answer_accuracy(results)
-    Path(args.out).write_text(json.dumps(results, indent=2), encoding="utf-8")
+    dated = write_run_results(results)
+    print(f"Wrote {dated} and generation_results.json")
     print(f"Anthropic calls this run: {calls['made']}")
 
 
