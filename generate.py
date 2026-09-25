@@ -542,7 +542,10 @@ def model_fields(advice):
     return fields
 
 
-def single_field_repair(problems):
+def wording_fields(problems):
+    """Fields to rewrite when every problem is a word limit or banned wording.
+    None when any problem is something else, so wording never becomes a full rewrite.
+    """
     fields = []
     for problem in problems:
         limit = FIELD_LIMIT_RE.match(problem)
@@ -553,9 +556,63 @@ def single_field_repair(problems):
             fields.append(jargon.group(1))
         else:
             return None
-    if len(set(fields)) == 1:
-        return fields[0]
-    return None
+    ordered = []
+    for field in fields:
+        if field not in ordered:
+            ordered.append(field)
+    return ordered
+
+
+def field_text(advice, field):
+    match = re.fullmatch(r"setup_steps\[(\d+)\]\.text", field)
+    if match:
+        return advice["setup_steps"][int(match.group(1))].get("text", "")
+    return advice.get(field, "")
+
+
+def problems_for_field(problems, field):
+    return [problem for problem in problems if problem.startswith(field + " ") or f"in {field}:" in problem]
+
+
+def check_field(advice, result, field):
+    """Word limit, banned wording, and, for a setup step, the content check."""
+    problems = []
+    text = field_text(advice, field)
+    limits = {"what_happened": 20, "swing_thought": 15, "why": 30}
+    limit = 15 if field.startswith("setup_steps[") else limits[field]
+    count = word_count(text)
+    if count > limit:
+        problems.append(f"{field} is {count} words, limit is {limit}")
+    lowered = text.lower()
+    for term in BANNED_JARGON:
+        if term in lowered:
+            problems.append(f"mechanical jargon in {field}: '{term}'")
+    for term, plain in plain_jargon(text):
+        problems.append(f"mechanical jargon in {field}: '{term}'. Say '{plain}' instead")
+    match = re.fullmatch(r"setup_steps\[(\d+)\]\.text", field)
+    if not match:
+        return problems
+    step = advice["setup_steps"][int(match.group(1))]
+    by_id = {entry["id"]: entry for entry in result["entries"]}
+    source_id = step.get("entry_id")
+    entry = by_id.get(source_id)
+    if entry is None:
+        return problems
+    fixes = listed_fixes(entry)
+    index = step.get("fix_index")
+    if isinstance(index, int) and 0 <= index < len(fixes):
+        if not (content_words(text) & content_words(fixes[index])):
+            problems.append(
+                f"setup_steps[{match.group(1)}].text does not match fix line {index} of {source_id}"
+            )
+    return problems
+
+
+def repair_custom_id(n, field):
+    if not field:
+        return f"repair{n}"
+    safe = re.sub(r"[^a-z0-9]+", "", field.lower())
+    return f"repair{n}-{safe}"
 
 
 def validate(advice, result, query=""):
@@ -746,23 +803,30 @@ def answer(query, result, differentials, entry_ids, live=False, stub=None, calls
     retried = False
     if problems:
         retried = True
-        field = single_field_repair(problems)
-        if field:
-            payload, tool_name = request_payload(
-                query, result, entry_ids, problems=problems, previous=advice.get(field, advice), field=field
-            )
-            rewritten, usage2, _called = complete(payload, tool_name, live, stub, calls)
-            advice = splice_field(advice, field, scrub_dashes(rewritten["text"]))
-        else:
+        fields = wording_fields(problems)
+        if fields:
+            for field in fields:
+                payload, tool_name = request_payload(
+                    query, result, entry_ids, problems=problems_for_field(problems, field),
+                    previous=field_text(advice, field), field=field,
+                )
+                rewritten, usage2, _called = complete(payload, tool_name, live, stub, calls)
+                advice = splice_field(advice, field, scrub_dashes(rewritten["text"]))
+                usage.input_tokens += usage2.input_tokens
+                usage.output_tokens += usage2.output_tokens
+                check_field(advice, result, field)
+            advice = apply_code_fields(advice, result, differentials, query)
+            problems = validate(advice, result, query)
+        elif START_DIRECTION_MSG not in problems:
             payload, tool_name = request_payload(
                 query, result, entry_ids, problems=problems, previous=advice
             )
             advice, usage2, _called = complete(payload, tool_name, live, stub, calls)
             advice = scrub_advice(advice)
-        usage.input_tokens += usage2.input_tokens
-        usage.output_tokens += usage2.output_tokens
-        advice = apply_code_fields(advice, result, differentials, query)
-        problems = validate(advice, result, query)
+            usage.input_tokens += usage2.input_tokens
+            usage.output_tokens += usage2.output_tokens
+            advice = apply_code_fields(advice, result, differentials, query)
+            problems = validate(advice, result, query)
     row = {
         "retried": retried,
         "query": query,
@@ -1159,13 +1223,39 @@ def run_batch(queries, found_by_n, entry_ids, differentials, calls, submit):
             rows_by_n[query["n"]] = row
             return
         row["retried"] = True
-        field = single_field_repair(problems)
-        repair_payload, repair_tool = request_payload(
-            query["query"], found, entry_ids, problems=problems,
-            previous=advice.get(field, advice) if field else advice,
-            field=field,
-        )
-        repairs.append((query, row, repair_payload, repair_tool, field))
+        if START_DIRECTION_MSG in problems:
+            row["clarified"] = True
+            row["message"] = LOW_CONFIDENCE_MESSAGE
+            rows_by_n[query["n"]] = row
+            return
+        wording = wording_fields(problems)
+        if wording is None:
+            other = [problem for problem in problems if FIELD_LIMIT_RE.match(problem) is None and JARGON_RE.match(problem) is None]
+            repair_payload, repair_tool = request_payload(
+                query["query"], found, entry_ids, problems=other or problems, previous=advice,
+            )
+            hit = read_cache(repair_payload, repair_tool)
+            if hit is None:
+                repairs.append((query, row, repair_payload, repair_tool, None))
+                rows_by_n[query["n"]] = row
+                return
+            advice = apply_code_fields(scrub_advice(hit[0]), found, differentials, query["query"])
+            row["advice"] = advice
+            row["tokens"]["in"] += hit[1]
+            row["tokens"]["out"] += hit[2]
+            problems = validate(advice, found, query["query"])
+            wording = wording_fields(problems)
+        if wording:
+            for field in wording:
+                repair_payload, repair_tool = request_payload(
+                    query["query"], found, entry_ids,
+                    problems=problems_for_field(problems, field),
+                    previous=field_text(advice, field), field=field,
+                )
+                repairs.append((query, row, repair_payload, repair_tool, field))
+        elif problems:
+            row["clarified"] = True
+            row["message"] = LOW_CONFIDENCE_MESSAGE
         rows_by_n[query["n"]] = row
 
     for query, payload, tool_name, hit in cached_first:
@@ -1200,17 +1290,17 @@ def run_batch(queries, found_by_n, entry_ids, differentials, calls, submit):
         repair_requests = []
         repair_ready = []
         for query, row, payload, tool_name, field in repairs:
+            custom_id = repair_custom_id(query["n"], field)
             hit = read_cache(payload, tool_name)
             if hit is not None:
-                repair_ready.append((query, row, payload, tool_name, field, hit[0], hit[1], hit[2], True))
+                repair_ready.append((query, row, custom_id, payload, tool_name, field, hit[0], hit[1], hit[2], True))
             else:
-                repair_requests.append({"custom_id": f"repair{query['n']}", "params": payload})
-                repair_ready.append((query, row, payload, tool_name, field, None, None, None, False))
+                repair_requests.append({"custom_id": custom_id, "params": payload})
+                repair_ready.append((query, row, custom_id, payload, tool_name, field, None, None, None, False))
         second = submit(repair_requests) if repair_requests else []
         by_repair = {item.custom_id: item for item in second}
         repair_errors = []
-        for query, row, payload, tool_name, field, advice, usage_in, usage_out, from_cache in repair_ready:
-            custom_id = f"repair{query['n']}"
+        for query, row, custom_id, payload, tool_name, field, advice, usage_in, usage_out, from_cache in repair_ready:
             if not from_cache:
                 item = by_repair.get(custom_id)
                 if item is None:
@@ -1233,15 +1323,22 @@ def run_batch(queries, found_by_n, entry_ids, differentials, calls, submit):
             found = found_by_n[query["n"]]
             if field:
                 row["advice"] = splice_field(row["advice"], field, scrub_dashes(advice["text"]))
+                check_field(row["advice"], found, field)
             else:
                 row["advice"] = scrub_advice(advice)
+            row["tokens"]["in"] += usage_in
+            row["tokens"]["out"] += usage_out
+        checked = set()
+        for query, row, _custom_id, _payload, _tool, _field, _advice, _in, _out, _cached in repair_ready:
+            if query["n"] in checked:
+                continue
+            checked.add(query["n"])
+            found = found_by_n[query["n"]]
             row["advice"] = apply_code_fields(row["advice"], found, differentials, query["query"])
             row["validation_problems"] = validate(row["advice"], found, query["query"])
             if row["validation_problems"]:
                 row["clarified"] = True
                 row["message"] = LOW_CONFIDENCE_MESSAGE
-            row["tokens"]["in"] += usage_in
-            row["tokens"]["out"] += usage_out
         if repair_errors:
             for line in repair_errors:
                 print(line)
