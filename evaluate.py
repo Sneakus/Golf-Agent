@@ -64,6 +64,25 @@ def per_query_metrics(ranked, relevant, k):
     }
 
 
+def wilson_ci(successes, n, z=1.959963984540054):
+    """95% Wilson interval for a proportion. Stays wide when every item passes."""
+    if n <= 0:
+        return (0.0, 0.0)
+    phat = successes / n
+    z2 = z * z
+    denom = 1 + z2 / n
+    center = (phat + z2 / (2 * n)) / denom
+    margin = z * ((phat * (1 - phat) + z2 / (4 * n)) / n) ** 0.5 / denom
+    return (max(0.0, center - margin), min(1.0, center + margin))
+
+
+def proportion_ci(values):
+    """Bootstrap, except an all-pass result uses the Wilson interval."""
+    if values and all(value == 1.0 for value in values):
+        return wilson_ci(len(values), len(values))
+    return bootstrap_ci(values)
+
+
 def bootstrap_ci(values, n=10000, alpha=0.05, seed=0):
     """95% percentile bootstrap CI for a mean. Standard in the IR literature."""
     if not values:
@@ -130,7 +149,7 @@ def report(rows, abst, k, mode, embed_tokens):
     for m in metrics:
         vals = [r[m] for r in rows]
         mean = sum(vals) / len(vals)
-        lo, hi = bootstrap_ci(vals)
+        lo, hi = proportion_ci(vals)
         summary[m] = {"score": round(mean, 3), "ci": [round(lo, 3), round(hi, 3)]}
         note = {
             "hit@1": "right entry ranked first",
@@ -145,7 +164,7 @@ def report(rows, abst, k, mode, embed_tokens):
         vals = [0.0 if r["declined"] else float(any(
             doc in set(r["expected"]) for doc in r["ranked"][:5])) for r in rows]
         mean = sum(vals) / len(vals)
-        lo, hi = bootstrap_ci(vals)
+        lo, hi = proportion_ci(vals)
         summary["hit@5"] = {"score": round(mean, 3), "ci": [round(lo, 3), round(hi, 3)]}
         print(f"{'hit@5':<12} {mean:>7.3f}   [{lo:.3f}, {hi:.3f}]   right entry in top 5")
 

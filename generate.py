@@ -717,35 +717,46 @@ def answer(query, result, differentials, entry_ids, live=False, stub=None, calls
         usage.output_tokens += usage2.output_tokens
         advice = apply_code_fields(advice, result, differentials, query)
         problems = validate(advice, result, query)
-    return {
+    row = {
         "retried": retried,
         "query": query,
         "retrieved": result["ids"],
         "refused": False,
+        "clarified": False,
         "top_dense_sim": round(result["top_dense_sim"], 3),
         "advice": advice,
         "validation_problems": problems,
         "tokens": {"in": usage.input_tokens, "out": usage.output_tokens},
     }
+    if problems:
+        row["clarified"] = True
+        row["message"] = LOW_CONFIDENCE_MESSAGE
+    return row
 
 
-def answer_accuracy_rows(results):
+def answer_accuracy_rows(results, shown_only):
     rows = []
     for result in results:
-        if result.get("refused"):
+        if result.get("should_refuse"):
             continue
-        expected = set(result["expected"])
-        chosen = result["advice"]["entry_id"]
+        if shown_only and (result.get("refused") or result.get("clarified")):
+            continue
+        if result.get("refused") or result.get("clarified"):
+            chosen = None
+            correct = 0.0
+        else:
+            chosen = result["advice"]["entry_id"]
+            correct = float(chosen in set(result["expected"]))
         rows.append({
             "subset": result["subset"], "n": result["n"], "query": result["query"],
             "expected": result["expected"], "chosen": chosen,
-            "correct": float(chosen in expected),
+            "correct": correct,
         })
     return rows
 
 
 def finish_eval(results, calls, batch=False, write=True):
-    answered = [row for row in results if not row["refused"]]
+    answered = [row for row in results if not row["refused"] and not row.get("clarified")]
     refused = [row for row in results if row["refused"]]
     should = [row for row in results if row["should_refuse"]]
     incoming = sum(row.get("tokens", {}).get("in", 0) for row in results)
@@ -756,9 +767,13 @@ def finish_eval(results, calls, batch=False, write=True):
     print(f"\nAnswered: {len(answered)}   Refused: {len(refused)}")
     print(f"Correct refusals: {sum(1 for row in should if row['refused'])}/{len(should)}")
     print(f"False refusals: {sum(1 for row in refused if not row['should_refuse'])}")
+    clarified = [row for row in results if row.get("clarified")]
     print(f"Repaired on retry: {sum(1 for row in answered if row.get('retried'))}")
-    failed = [row for row in answered if row["validation_problems"]]
+    failed = [row for row in answered if row.get("validation_problems")]
     print(f"Validation failures after retry: {len(failed)}/{len(answered)}")
+    print(f"Clarified: {len(clarified)}")
+    for row in clarified:
+        print(f"  {row['n']} {row['query']}")
     report_answer_accuracy(results)
     print(f"Tokens: {incoming:,} in, {outgoing:,} out")
     print(f"Estimated cost: ${cost:.2f}" + (" at batch half price" if batch else ""))
@@ -769,25 +784,35 @@ def finish_eval(results, calls, batch=False, write=True):
 
 
 def report_answer_accuracy(results):
-    from evaluate import bootstrap_ci
-    rows = answer_accuracy_rows(results)
-    if not rows:
-        return
-    print("\nAnswer-level accuracy: diagnosed entry is one of the expected entries")
-    print(f"{'Metric':<12} {'Score':>7}   {'95% CI':>16}   Correct")
-    print("-" * 60)
+    from evaluate import proportion_ci
 
-    def emit(label, group):
+    def emit(group):
+        if not group:
+            print("  none")
+            return
         vals = [row["correct"] for row in group]
         mean = sum(vals) / len(vals)
-        lo, hi = bootstrap_ci(vals)
-        print(f"{label:<12} {mean:>7.3f}   [{lo:.3f}, {hi:.3f}]   {int(sum(vals))}/{len(vals)}")
+        lo, hi = proportion_ci(vals)
+        print(f"{'overall':<12} {mean:>7.3f}   [{lo:.3f}, {hi:.3f}]   {int(sum(vals))}/{len(vals)}")
+        for subset in ("A1", "A2", "A3"):
+            part = [row for row in group if row["subset"] == subset]
+            if not part:
+                continue
+            part_vals = [row["correct"] for row in part]
+            part_mean = sum(part_vals) / len(part_vals)
+            part_lo, part_hi = proportion_ci(part_vals)
+            print(f"{subset:<12} {part_mean:>7.3f}   [{part_lo:.3f}, {part_hi:.3f}]   "
+                  f"{int(sum(part_vals))}/{len(part_vals)}")
 
-    emit("overall", rows)
-    for subset in ("A1", "A2", "A3"):
-        group = [row for row in rows if row["subset"] == subset]
-        if group:
-            emit(subset, group)
+    print("\nAnswer-level accuracy over answers shown")
+    print(f"{'Metric':<12} {'Score':>7}   {'95% CI':>16}   Correct")
+    print("-" * 60)
+    emit(answer_accuracy_rows(results, shown_only=True))
+    print("\nAnswer-level accuracy over all answerable queries")
+    print("A clarification counts as not correct.")
+    print(f"{'Metric':<12} {'Score':>7}   {'95% CI':>16}   Correct")
+    print("-" * 60)
+    emit(answer_accuracy_rows(results, shown_only=False))
 
 
 def print_answer(answer_row, plain=False):
@@ -796,6 +821,9 @@ def print_answer(answer_row, plain=False):
         print(f"Retrieved: {', '.join(answer_row['retrieved'])}  (top dense sim {answer_row['top_dense_sim']})")
     if answer_row.get("refused"):
         print(answer_row["message"] if plain else f"\nDECLINED ({answer_row['kind']})\n  {answer_row['message']}")
+        return
+    if answer_row.get("clarified"):
+        print(answer_row["message"] if plain else f"\nCLARIFIED\n  {answer_row['message']}")
         return
     advice = answer_row["advice"]
     prefix = "" if plain else "  "
@@ -1156,6 +1184,9 @@ def run_batch(queries, found_by_n, entry_ids, differentials, calls, submit):
                 row["advice"] = scrub_advice(advice)
             row["advice"] = apply_code_fields(row["advice"], found, differentials, query["query"])
             row["validation_problems"] = validate(row["advice"], found, query["query"])
+            if row["validation_problems"]:
+                row["clarified"] = True
+                row["message"] = LOW_CONFIDENCE_MESSAGE
             row["tokens"]["in"] += usage_in
             row["tokens"]["out"] += usage_out
         if repair_errors:
@@ -1177,9 +1208,13 @@ def batch_error_line(item):
 
 
 def submit_batch(requests, live, calls):
-    """Message Batches API at half price. Not run unless --batch is passed."""
+    """Message Batches API at half price. A fully cached run never reaches this call."""
+    if not requests:
+        return []
     if not live:
-        raise SystemExit("Batch mode is a live Anthropic call. GOLF_LIVE is not set, so it was not submitted.")
+        raise SystemExit(
+            "Batch mode would submit a request. GOLF_LIVE is not set, so it was not submitted."
+        )
     if calls["made"] + len(requests) > calls["max"]:
         raise SystemExit("Batch would exceed --max-calls. It was not submitted.")
     import anthropic
