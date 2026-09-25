@@ -24,7 +24,8 @@ The live retrieval pass is seven entries, with no top-1 guarantee and reciprocal
 | First-pass repairs | 7 | | Answers rewritten once before they were shown |
 | Failures shown | 0 | | No failed answer is shown to the golfer |
 | Clarified | 1 | | Query 13 asks where the ball started and which way it curved |
-| Cost per full batch | about $0.47 | | Half-price batch. A cached rerun spends $0 |
+| Shown with original wording | 1 | | Query 55. The plain-wording rewrite ran long, so the original wording was kept |
+| Cost per full batch | about $0.47 | | Half-price batch. The later wording rewrites cost $0.06. A cached rerun spends $0 |
 
 hit@5 means the correct entry appeared somewhere in the top five. It does not mean the tool gave the right answer. Ranking it first is hit@1, 0.746.
 
@@ -40,6 +41,10 @@ The eval set is saturated on diagnosis: the last batch matched the labelled entr
 
 The seven-entry pass was chosen by sweeping this same eval set. The gain is measured on the queries used to choose it. Passing more candidates is a structural change rather than a tuned knob, which limits the overfitting risk, but it does not remove it.
 
+Plain wording is checked after the answer is written, so about a third of answers need an extra rewrite. Moving that plain-word list into the main prompt is the next step.
+
+Entries tied at the edge of the top 7 can occasionally swap between runs.
+
 **On significance.** 59 answerable queries means one query is worth 1.7 points. The information retrieval literature treats 50 queries as a working minimum and suggests roughly 150 to reliably distinguish systems, so differences smaller than the confidence interval width are not meaningful. The improvements below are directional.
 
 ## How it works
@@ -52,7 +57,7 @@ Causes are always plural. A slice can come from path, from face angle, or from a
 
 **Abstention.** Out-of-scope questions are handled by giving retrieval something correct to return rather than by a confidence threshold. Equipment, rules, handicap, mental game, injury, etiquette each have an entry. If one ranks first, the tool declines and redirects.
 
-**Generation.** The model fills a strict tool schema: what happened, up to three setup steps, one headline thought, and why. Each setup step names the entry and the exact Fixes or Adjustments line it comes from, and must share meaningful words with that line. Code writes "If it keeps happening" from the differential table, in either direction, using the table's own words, and builds the sources list from every entry the answer used. On a tee shot the follow-up skips rows that involve a lie. Compensation notes and evidence tiers are removed from the text the model sees. They stay in the corpus and in the retrieval index. Strategy and conditions headlines are labelled Key thought. The one-thought limit still applies only to that headline. If an answer still fails validation after one repair, it is not shown. The golfer is asked where the ball started and which way it curved.
+**Generation.** The model fills a strict tool schema: what happened, up to three setup steps, one headline thought, and why. Each setup step names the entry and the exact Fixes or Adjustments line it comes from, and must share meaningful words with that line. Code writes "If it keeps happening" from the differential table, in either direction, using the table's own words, and builds the sources list from every entry the answer used. On a tee shot the follow-up skips rows that involve a lie. Compensation notes and evidence tiers are removed from the text the model sees. They stay in the corpus and in the retrieval index. Strategy and conditions headlines are labelled Key thought. The one-thought limit still applies only to that headline. Plain wording is checked after the answer is written. If that rewrite fails and every other check passed, the answer is shown with its original wording. Any other failure is not shown. The golfer is asked where the ball started and which way it curved.
 
 Live Anthropic calls require `GOLF_LIVE=1`. A batch submits only requests that are not already cached, so a fully cached run makes no API call and does not need `GOLF_LIVE`. Responses are cached by a hash of the request. A live eval prints the cost from the last full saved run and stops above $0.50 unless `--confirm-cost` is set. The summary then separates money spent on this run from the original cost of producing those answers. `--max-calls` defaults to 25. Generation reads `retrieval_snapshot.json` unless `--fresh-retrieval` is given, and refuses a snapshot whose configuration hash does not match. The model's self-reported fit field was removed: it never fired in testing, including on the two known retrieval misses.
 
