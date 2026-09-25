@@ -8,20 +8,37 @@ Built as a retrieval and evaluation exercise. The golf is the domain; the intere
 
 ## Results
 
-Retrieval, 59 answerable and 8 non-fault queries, 95% bootstrap confidence intervals over 10,000 resamples:
+The live retrieval pass is seven entries, with no top-1 guarantee and reciprocal rank fusion at k 60. Retrieval is scored on 59 answerable queries and 8 that should be declined. When every query passes, the interval is a Wilson 95% interval, because a bootstrap interval collapses to a single point. Otherwise the interval is a 95% bootstrap over 10,000 resamples.
 
-| Metric | Score | 95% CI | What it means |
+| Metric | Result | 95% interval | What it means |
 |---|---|---|---|
-| hit@5 | 0.966 | 0.915 to 1.000 | Correct entry in the top five results |
-| hit@1 | 0.729 | 0.610 to 0.831 | Correct entry ranked first |
-| recall@5 | 0.928 | 0.869 to 0.975 | Share of relevant entries found |
-| MRR | 0.825 | 0.745 to 0.897 | How high the first correct hit lands |
-| NDCG@5 | 0.844 | 0.771 to 0.907 | Rank-weighted quality |
-| Abstention | 1.000 | | 8 of 8, zero false declines |
+| hit@1 | 0.746 | 0.627 to 0.847 | Correct entry ranked first |
+| hit@5 | 0.966 | 0.915 to 1.000 | Correct entry somewhere in the top five |
+| hit@7 | 59 of 59 | 0.939 to 1.000 | Correct entry in the seven entries passed to the model |
+| recall@7 | 0.959 | 0.919 to 0.992 | Share of relevant entries found in those seven |
+| MRR | 0.839 | 0.761 to 0.906 | How high the first correct hit lands |
+| NDCG@7 | 0.858 | 0.794 to 0.915 | Rank-weighted quality of the top seven |
+| Abstention | 8 of 8 | | Out-of-scope and no-fault queries declined, with no false declines |
+| Answer accuracy, shown | 58 of 58 | 0.938 to 1.000 | Diagnosed entry matches the label, among answers actually shown |
+| Answer accuracy, overall | 58 of 59 | 0.910 to 0.997 | Same score over every answerable query. A clarifying question counts as not correct |
+| First-pass repairs | 7 | | Answers rewritten once before they were shown |
+| Failures shown | 0 | | No failed answer is shown to the golfer |
+| Clarified | 1 | | Query 13 asks where the ball started and which way it curved |
+| Cost per full batch | about $0.47 | | Half-price batch. A cached rerun spends $0 |
 
-**hit@5 and hit@1 are different claims.** hit@5 of 0.966 means the correct entry appeared somewhere in the top five, not that the tool gave the right answer. The number for ranking it first is hit@1 at 0.729. MRR of 0.825 sitting close to hit@1 means that when the right entry is not first it is almost always second.
+hit@5 means the correct entry appeared somewhere in the top five. It does not mean the tool gave the right answer. Ranking it first is hit@1, 0.746.
 
-Generation, richer-answer baseline: 59 answered, 8 of 8 correct refusals, 0 false refusals, and 0 validation failures after repair. The first attempt needed repair on 18 answers. Answers averaged 68.6 words, reached 98 at most, and 39 of 59 included setup steps. The full run used 293,324 input and 20,385 output tokens, about $1.20.
+An AI-assisted review read every answer from the last full batch: 46 fully correct, 11 flawed, and 2 wrong. Real-world testing on the course is still going.
+
+## Known limits
+
+Query 38 regressed. The golfer said the break never took, and the answer says the putt was too slow.
+
+Query 13 never said where the ball started. The answer failed validation, so the golfer now gets a clarifying question instead of that advice.
+
+The eval set is saturated on diagnosis: the last batch matched the labelled entry on all 59 answerable queries. Further improvement needs new queries that were not used to tune the system.
+
+The seven-entry pass was chosen by sweeping this same eval set. The gain is measured on the queries used to choose it. Passing more candidates is a structural change rather than a tuned knob, which limits the overfitting risk, but it does not remove it.
 
 **On significance.** 59 answerable queries means one query is worth 1.7 points. The information retrieval literature treats 50 queries as a working minimum and suggests roughly 150 to reliably distinguish systems, so differences smaller than the confidence interval width are not meaningful. The improvements below are directional.
 
@@ -35,9 +52,9 @@ Causes are always plural. A slice can come from path, from face angle, or from a
 
 **Abstention.** Out-of-scope questions are handled by giving retrieval something correct to return rather than by a confidence threshold. Equipment, rules, handicap, mental game, injury, etiquette each have an entry. If one ranks first, the tool declines and redirects.
 
-**Generation.** The model fills a strict tool schema: what happened, up to three setup steps, one headline thought, and why. Each setup step names the entry and the exact Fixes or Adjustments line it comes from, and must share meaningful words with that line. Code writes "If it keeps happening" from the differential table, in either direction, using the table's own words, and builds the sources list from every entry the answer used. Compensation notes and evidence tiers are removed from the text the model sees. They stay in the corpus and in the retrieval index. Strategy and conditions headlines are labelled Key thought. The one-thought limit still applies only to that headline.
+**Generation.** The model fills a strict tool schema: what happened, up to three setup steps, one headline thought, and why. Each setup step names the entry and the exact Fixes or Adjustments line it comes from, and must share meaningful words with that line. Code writes "If it keeps happening" from the differential table, in either direction, using the table's own words, and builds the sources list from every entry the answer used. On a tee shot the follow-up skips rows that involve a lie. Compensation notes and evidence tiers are removed from the text the model sees. They stay in the corpus and in the retrieval index. Strategy and conditions headlines are labelled Key thought. The one-thought limit still applies only to that headline. If an answer still fails validation after one repair, it is not shown. The golfer is asked where the ball started and which way it curved.
 
-Live Anthropic calls require `GOLF_LIVE=1`. Otherwise generate.py replays cached responses and stops on a cache miss. Responses are cached by a hash of the request. A live eval prints an estimated cost from the last saved token counts and stops above $0.50 unless `--confirm-cost` is set. `--max-calls` defaults to 25. Generation reads `retrieval_snapshot.json` unless `--fresh-retrieval` is given, and refuses a snapshot whose configuration hash does not match. The model's self-reported fit field was removed: it never fired in testing, including on the two known retrieval misses.
+Live Anthropic calls require `GOLF_LIVE=1`. A batch submits only requests that are not already cached, so a fully cached run makes no API call and does not need `GOLF_LIVE`. Responses are cached by a hash of the request. A live eval prints the cost from the last full saved run and stops above $0.50 unless `--confirm-cost` is set. The summary then separates money spent on this run from the original cost of producing those answers. `--max-calls` defaults to 25. Generation reads `retrieval_snapshot.json` unless `--fresh-retrieval` is given, and refuses a snapshot whose configuration hash does not match. The model's self-reported fit field was removed: it never fired in testing, including on the two known retrieval misses.
 
 Refusal is decided in code before the model is called. A model handed a question and loosely related documents will usually find something to say, so removing the opportunity is more reliable than instructing against it.
 
@@ -136,7 +153,7 @@ Workflow export: [`n8n-workflow.json`](n8n-workflow.json). Full specification: [
 
 **Deliberately out of scope:** equipment and fitting advice, rules procedure, anything medical. Each has an entry explaining why and pointing elsewhere.
 
-**Not claimed:** this is not production RAG infrastructure. There is no separate vector store, because 54 documents in numpy is faster than a network call. No re-indexing at scale, no multi-tenancy, no caching. Those are problems this corpus does not have.
+**Not claimed:** this is not production RAG infrastructure. There is no separate vector store, because 54 documents in numpy is faster than a network call. No re-indexing at scale and no multi-tenancy. Those are problems this corpus does not have. Generation responses are cached locally so a repeated eval does not pay for the same request twice.
 
 ## Notes on the corpus
 

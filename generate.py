@@ -347,6 +347,45 @@ STRUCTURAL_GRIP_RE = re.compile(
 def structural_grip_change(text):
     """Grip strength or hand position on the grip. Where the club is held is allowed."""
     return STRUCTURAL_GRIP_RE.search(text or "") is not None
+
+
+OPEN_TO_PATH_RE = re.compile(r"\bopen to (?:the |that )?(?:swing )?path\b", re.I)
+CLOSED_TO_PATH_RE = re.compile(r"\bclosed to (?:the |that )?(?:swing )?path\b", re.I)
+CART_PATH_RE = re.compile(r"\bcart paths?\b", re.I)
+
+
+def plain_jargon(text):
+    """Banned wording with the plain phrase a one-field rewrite should use."""
+    found = []
+    if OPEN_TO_PATH_RE.search(text or ""):
+        found.append(("open to the path", "pointing right of where the club was swinging"))
+    if CLOSED_TO_PATH_RE.search(text or ""):
+        found.append(("closed to the path", "pointing left of where the club was swinging"))
+    without_cart = CART_PATH_RE.sub(" ", text or "")
+    without_specific = OPEN_TO_PATH_RE.sub(" ", CLOSED_TO_PATH_RE.sub(" ", without_cart))
+    if re.search(r"\bpath\b", without_specific, re.I):
+        found.append(("path", "the direction the club was swinging"))
+    if re.search(r"\bmatched\b", text or "", re.I) and re.search(r"\bface\b", text or "", re.I):
+        found.append(("matched", "pointing the same way"))
+    if re.search(r"\bequator\b", text or "", re.I):
+        found.append(("equator", "the middle of the ball"))
+    if re.search(r"\barc\b", text or "", re.I):
+        found.append(("arc", "the lowest point of the swing"))
+    if re.search(r"\bdispersion\b", text or "", re.I):
+        found.append(("dispersion", "spread of shots"))
+    if re.search(r"\bcalibration\b", text or "", re.I):
+        found.append(("calibration", "adjustment"))
+    if re.search(r"\bcalibrat(?:e|ing)\b", text or "", re.I):
+        found.append(("calibrate", "adjust"))
+    if re.search(r"\bcompensation\b", text or "", re.I):
+        found.append(("compensation", "a second fault that cancels out the first"))
+    if re.search(r"\breleas(?:e|ing)\b", text or "", re.I) and re.search(
+        r"\b(?:club|clubhead|hands?)\b", text or "", re.I
+    ):
+        found.append(("release", "letting the clubhead pass the hands too early"))
+    if re.search(r"\bstrike location\b", text or "", re.I):
+        found.append(("strike location", "where on the face you hit it"))
+    return found
 FIELD_LIMIT_RE = re.compile(
     r"^(what_happened|swing_thought|why|setup_steps\[\d+\]\.text) is \d+ words"
 )
@@ -535,6 +574,8 @@ def validate(advice, result, query=""):
         for term in BANNED_JARGON:
             if term in lowered:
                 problems.append(f"mechanical jargon in {field}: '{term}'")
+        for term, plain in plain_jargon(text):
+            problems.append(f"mechanical jargon in {field}: '{term}'. Say '{plain}' instead")
         if "\u2014" in text or "\u2013" in text:
             problems.append(f"{field} contains an em dash or en dash")
     if len(re.findall(r"[.!?]+(?:\s|$)", advice.get("what_happened", ""))) != 1:
@@ -607,6 +648,7 @@ def request_payload(query, result, entry_ids, problems=None, previous=None, fiel
             f"Rewrite only {field}. Previous text: {json.dumps(previous)}\n"
             f"Failures:\n" + "\n".join(f"- {problem}" for problem in problems) +
             "\nStay within its word limit and use none of the banned mechanical terms."
+            "\nWhere a failure names a plain phrase, use that phrase."
         )
         tool_name = "rewrite_field"
     else:
@@ -668,6 +710,10 @@ def complete(payload, tool_name, live, stub, calls):
         extra_body={"temperature": temperature} if temperature is not None else None,
     )
     calls["made"] += 1
+    calls["spend"] = calls.get("spend", 0.0) + (
+        response.usage.input_tokens * INPUT_USD_PER_TOKEN
+        + response.usage.output_tokens * OUTPUT_USD_PER_TOKEN
+    )
     advice = None
     for block in response.content:
         if block.type == "tool_use" and block.name == tool_name:
@@ -776,7 +822,8 @@ def finish_eval(results, calls, batch=False, write=True):
         print(f"  {row['n']} {row['query']}")
     report_answer_accuracy(results)
     print(f"Tokens: {incoming:,} in, {outgoing:,} out")
-    print(f"Estimated cost: ${cost:.2f}" + (" at batch half price" if batch else ""))
+    print(f"Actual spend this run: ${calls.get('spend', 0):.2f}")
+    print(f"Original cost of these answers: ${cost:.2f}" + (" at batch half price" if batch else ""))
     if write:
         dated = write_run_results(results)
         print(f"Wrote {dated} and generation_results.json")
@@ -1088,6 +1135,9 @@ def run_batch(queries, found_by_n, entry_ids, differentials, calls, submit):
     def take_first(query, payload, tool_name, advice, usage_in, usage_out, from_cache):
         if not from_cache:
             store_cache(payload, tool_name, advice, usage_in, usage_out)
+            calls["spend"] = calls.get("spend", 0.0) + 0.5 * (
+                usage_in * INPUT_USD_PER_TOKEN + usage_out * OUTPUT_USD_PER_TOKEN
+            )
         found = found_by_n[query["n"]]
         advice = apply_code_fields(scrub_advice(advice), found, differentials, query["query"])
         problems = validate(advice, found, query["query"])
@@ -1177,6 +1227,9 @@ def run_batch(queries, found_by_n, entry_ids, differentials, calls, submit):
                 usage_in = message.usage.input_tokens
                 usage_out = message.usage.output_tokens
                 store_cache(payload, tool_name, advice, usage_in, usage_out)
+                calls["spend"] = calls.get("spend", 0.0) + 0.5 * (
+                    usage_in * INPUT_USD_PER_TOKEN + usage_out * OUTPUT_USD_PER_TOKEN
+                )
             found = found_by_n[query["n"]]
             if field:
                 row["advice"] = splice_field(row["advice"], field, scrub_dashes(advice["text"]))
@@ -1253,7 +1306,7 @@ def main():
         return
 
     live = live_enabled()
-    calls = {"made": 0, "max": args.max_calls}
+    calls = {"made": 0, "max": args.max_calls, "spend": 0.0}
     if args.write_snapshot or args.fresh_retrieval or args.query:
         retriever = Retriever(args.corpus)
         if args.write_snapshot:
