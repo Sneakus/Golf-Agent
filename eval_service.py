@@ -48,7 +48,8 @@ _retriever_hash = None
 def corpus_hash():
     h = hashlib.sha256()
     for name in CORPUS:
-        h.update((ROOT / name).read_bytes())
+        data = (ROOT / name).read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+        h.update(data)
     return h.hexdigest()
 
 

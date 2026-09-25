@@ -358,19 +358,19 @@ def plain_jargon(text):
     """Banned wording with the plain phrase a one-field rewrite should use."""
     found = []
     if OPEN_TO_PATH_RE.search(text or ""):
-        found.append(("open to the path", "pointing right of where the club was swinging"))
+        found.append(("open to the path", "aimed right of the swing"))
     if CLOSED_TO_PATH_RE.search(text or ""):
-        found.append(("closed to the path", "pointing left of where the club was swinging"))
+        found.append(("closed to the path", "aimed left of the swing"))
     without_cart = CART_PATH_RE.sub(" ", text or "")
     without_specific = OPEN_TO_PATH_RE.sub(" ", CLOSED_TO_PATH_RE.sub(" ", without_cart))
     if re.search(r"\bpath\b", without_specific, re.I):
-        found.append(("path", "the direction the club was swinging"))
+        found.append(("path", "swing direction"))
     if re.search(r"\bmatched\b", text or "", re.I) and re.search(r"\bface\b", text or "", re.I):
-        found.append(("matched", "pointing the same way"))
+        found.append(("matched", "lined up"))
     if re.search(r"\bequator\b", text or "", re.I):
-        found.append(("equator", "the middle of the ball"))
+        found.append(("equator", "middle of the ball"))
     if re.search(r"\barc\b", text or "", re.I):
-        found.append(("arc", "the lowest point of the swing"))
+        found.append(("arc", "bottom of the swing"))
     if re.search(r"\bdispersion\b", text or "", re.I):
         found.append(("dispersion", "spread of shots"))
     if re.search(r"\bcalibration\b", text or "", re.I):
@@ -403,10 +403,16 @@ def cache_key(payload):
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
+def corpus_fingerprint(path):
+    """Hash the corpus text. Carriage returns are ignored, so a Windows checkout matches."""
+    data = Path(path).read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(data).hexdigest()
+
+
 def retrieval_config_hash(corpus_paths):
     parts = ["alias_weighted", "rrf=60", "k=7", "top1_guarantee=off"]
     for path in corpus_paths:
-        parts.append(hashlib.sha256(Path(path).read_bytes()).hexdigest())
+        parts.append(corpus_fingerprint(path))
     return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
 
 
@@ -540,6 +546,15 @@ def model_fields(advice):
     for i, step in enumerate(advice.get("setup_steps") or []):
         fields.append((f"setup_steps[{i}].text", step.get("text", "")))
     return fields
+
+
+def keep_original_wording(advice, original, result, query):
+    """A failed plain-wording rewrite must not hide an answer that passed every other check."""
+    problems = validate(advice, result, query)
+    if not problems or wording_fields(problems) is None or original is None:
+        return advice, problems, False
+    restored = json.loads(json.dumps(original))
+    return restored, validate(restored, result, query), True
 
 
 def wording_fields(problems):
@@ -801,10 +816,12 @@ def answer(query, result, differentials, entry_ids, live=False, stub=None, calls
     advice = apply_code_fields(scrub_advice(advice), result, differentials, query)
     problems = validate(advice, result, query)
     retried = False
+    wording_issue = False
     if problems:
         retried = True
         fields = wording_fields(problems)
         if fields:
+            original = json.loads(json.dumps(advice))
             for field in fields:
                 payload, tool_name = request_payload(
                     query, result, entry_ids, problems=problems_for_field(problems, field),
@@ -817,6 +834,7 @@ def answer(query, result, differentials, entry_ids, live=False, stub=None, calls
                 check_field(advice, result, field)
             advice = apply_code_fields(advice, result, differentials, query)
             problems = validate(advice, result, query)
+            advice, problems, wording_issue = keep_original_wording(advice, original, result, query)
         elif START_DIRECTION_MSG not in problems:
             payload, tool_name = request_payload(
                 query, result, entry_ids, problems=problems, previous=advice
@@ -836,9 +854,10 @@ def answer(query, result, differentials, entry_ids, live=False, stub=None, calls
         "top_dense_sim": round(result["top_dense_sim"], 3),
         "advice": advice,
         "validation_problems": problems,
+        "wording_issue": wording_issue,
         "tokens": {"in": usage.input_tokens, "out": usage.output_tokens},
     }
-    if problems:
+    if problems and not row["wording_issue"]:
         row["clarified"] = True
         row["message"] = LOW_CONFIDENCE_MESSAGE
     return row
@@ -879,8 +898,12 @@ def finish_eval(results, calls, batch=False, write=True):
     print(f"False refusals: {sum(1 for row in refused if not row['should_refuse'])}")
     clarified = [row for row in results if row.get("clarified")]
     print(f"Repaired on retry: {sum(1 for row in answered if row.get('retried'))}")
-    failed = [row for row in answered if row.get("validation_problems")]
+    failed = [row for row in answered if row.get("validation_problems") and not row.get("wording_issue")]
+    wording_issues = [row for row in answered if row.get("wording_issue")]
     print(f"Validation failures after retry: {len(failed)}/{len(answered)}")
+    print(f"Shown with a wording issue: {len(wording_issues)}")
+    for row in wording_issues:
+        print(f"  {row['n']} {row['query']}")
     print(f"Clarified: {len(clarified)}")
     for row in clarified:
         print(f"  {row['n']} {row['query']}")
@@ -1244,8 +1267,10 @@ def run_batch(queries, found_by_n, entry_ids, differentials, calls, submit):
             row["tokens"]["in"] += hit[1]
             row["tokens"]["out"] += hit[2]
             problems = validate(advice, found, query["query"])
+            row["validation_problems"] = problems
             wording = wording_fields(problems)
         if wording:
+            row["_before_wording"] = json.loads(json.dumps(row["advice"]))
             for field in wording:
                 repair_payload, repair_tool = request_payload(
                     query["query"], found, entry_ids,
@@ -1335,8 +1360,11 @@ def run_batch(queries, found_by_n, entry_ids, differentials, calls, submit):
             checked.add(query["n"])
             found = found_by_n[query["n"]]
             row["advice"] = apply_code_fields(row["advice"], found, differentials, query["query"])
-            row["validation_problems"] = validate(row["advice"], found, query["query"])
-            if row["validation_problems"]:
+            original = row.pop("_before_wording", None)
+            row["advice"], row["validation_problems"], row["wording_issue"] = keep_original_wording(
+                row["advice"], original, found, query["query"]
+            )
+            if row["validation_problems"] and not row["wording_issue"]:
                 row["clarified"] = True
                 row["message"] = LOW_CONFIDENCE_MESSAGE
         if repair_errors:
