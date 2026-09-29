@@ -117,6 +117,27 @@ python tune_threshold.py --corpus golf-fault-corpus-v3.md golf-out-of-scope-entr
 
 The eval runs in CI on every push touching the corpus, the eval set or the retrieval code, and fails the build if recall@5 drops below 0.90.
 
+## Telegram bot
+
+A private bot so you can ask from your phone. It uses the same retrieval, checks, clarifying question and plain-wording rewrites as `generate.py`. The reply leaves out entry tags and the sources line. Those are written to `bot_log.jsonl` with the question, cost, rating and any note. Under each answer, Useful and Not right. Not right asks what was off, and the next message is saved as the note.
+
+It polls Telegram, so it does not need a public address. Only the chat id in `TELEGRAM_CHAT_ID` gets a reply. Live calls run only when `GOLF_LIVE=1` is set in that window. After 30 answers in a day it replies "Daily limit reached".
+
+```
+pip install python-telegram-bot
+setx TELEGRAM_BOT_TOKEN "your-token"
+setx TELEGRAM_CHAT_ID "your-chat-id"
+```
+
+Close Command Prompt and open it again so the two saved values load. Then, in that window only:
+
+```
+set GOLF_LIVE=1
+python telegram_bot.py
+```
+
+`setx` stores the token and chat id for later windows. `set GOLF_LIVE=1` lasts only until that window closes.
+
 ## Automation
 
 The eval runs in two places, which gives a direct comparison between the two tools.

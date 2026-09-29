@@ -10,4 +10,5 @@ __pycache__/
 review/
 .golf-cache/
 retrieval_snapshot.json
+bot_log.jsonl
 
