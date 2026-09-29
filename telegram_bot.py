@@ -21,7 +21,7 @@ CORPUS = [
 ]
 START_TEXT = (
     "Describe a bad shot in your own words. "
-    "I'll reply with what happened and one thing to try next time."
+    "I'll tell you what happened and what to try next time."
 )
 ERROR_TEXT = "Something went wrong, try again"
 LIMIT_TEXT = "Daily limit reached"
@@ -388,7 +388,7 @@ def run_offline_test():
 
     start = FakeUpdate("/start", 42)
     asyncio.run(on_start(start, context))
-    assert "Describe a bad shot" in start.message.replies[0]["text"]
+    assert start.message.replies[0]["text"] == START_TEXT
 
     def boom(_payload, tool_name):
         raise RuntimeError("api down")
