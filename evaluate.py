@@ -169,10 +169,14 @@ def report(rows, abst, k, mode, embed_tokens):
         print(f"{'hit@5':<12} {mean:>7.3f}   [{lo:.3f}, {hi:.3f}]   right entry in top 5")
 
     correct = sum(a["correct"] for a in abst)
-    print(f"{'abstention':<12} {correct/len(abst):>7.3f}   {'':>16}   "
-          f"{correct}/{len(abst)} correctly declined")
-    summary["abstention"] = {"score": round(correct / len(abst), 3),
-                             "n": len(abst)}
+    if abst:
+        print(f"{'abstention':<12} {correct/len(abst):>7.3f}   {'':>16}   "
+              f"{correct}/{len(abst)} correctly declined")
+        summary["abstention"] = {"score": round(correct / len(abst), 3),
+                                 "n": len(abst)}
+    else:
+        print(f"{'abstention':<12} {'n/a':>7}   {'':>16}   no non-fault queries in this set")
+        summary["abstention"] = {"score": None, "n": 0}
 
     # subset breakdown
     subsets = {}

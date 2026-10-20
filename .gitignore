@@ -13,3 +13,5 @@ review/
 retrieval_snapshot.json
 bot_log.jsonl
 
+exports/*
+!exports/golf-coach-library.json
