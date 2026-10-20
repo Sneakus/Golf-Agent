@@ -1,0 +1,1203 @@
+{
+  "source": {
+    "files": [
+      {
+        "file": "golf-fault-corpus-v3.md",
+        "sha256": "cf3892e270c33302185770576431ba84ed12ea4c1a9c183e39ae89bcb23559a4"
+      },
+      {
+        "file": "golf-out-of-scope-entries.md",
+        "sha256": "3036eeb74ad6f5df9d8da50d78d1b7433b2943aa7ccaebc582838856bac22b80",
+        "entries": [
+          "N001"
+        ]
+      }
+    ],
+    "hash_note": "sha256 of the file text with line endings normalised to LF",
+    "export_date": "2026-10-20",
+    "note": "Text is copied exactly as written in the corpus. The How I'd describe it, Evidence tier and Compensation risk lines are left out."
+  },
+  "fix_kinds": {
+    "feel": "a swing feel or cue",
+    "setup": "something done before the swing, such as ball position, aim or tee height",
+    "structural": "a lasting change such as grip strength, which is not a next-shot fix",
+    "pointer": "a line that only points at another entry's fixes"
+  },
+  "entries": [
+    {
+      "id": "F001",
+      "name": "Slice",
+      "what_it_is": "Face open to path, producing right curvature. The classic amateur version starts left or straight and curves hard right.",
+      "causes": [
+        {
+          "text": "Out-to-in path with face open to that path.",
+          "signal": "ball starts left of target then curves right."
+        },
+        {
+          "text": "Face open to target and to path.",
+          "signal": "ball starts right and curves further right."
+        },
+        {
+          "text": "Heel strike via gear effect.",
+          "signal": "face marking toward the heel, ball speed down, curve present even when path feels neutral."
+        },
+        {
+          "text": "Early extension pushing the hands out and the path left.",
+          "signal": "often paired with thin or heel contact."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Strengthen the grip so the face sits more closed. Highest-leverage single change, because face dominates start direction.",
+          "kind": "structural",
+          "kind_reason": "matches generate.py's structural grip rule: grip strength or how the hands sit on the grip"
+        },
+        {
+          "text": "Feel the clubhead exit right of the target through impact.",
+          "kind": "feel",
+          "kind_reason": "starts with 'feel', a cue for the swing itself"
+        },
+        {
+          "text": "Check strike location on the face before changing anything in the swing.",
+          "kind": "setup",
+          "kind_reason": "starts with 'check', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "F001 slice",
+          "commonly_confused_with": "F002 pull-slice, F003 push-slice",
+          "what_separates_them": "Check where it started: left means a pull-slice, right means a push-slice, straight means a slice."
+        },
+        {
+          "entry": "F001 slice",
+          "commonly_confused_with": "L001 ball below feet",
+          "what_separates_them": "If it only happens with the ball below your feet, the lie is the cause."
+        }
+      ]
+    },
+    {
+      "id": "F002",
+      "name": "Pull-slice",
+      "what_it_is": "Face closed to target but path even further left, so the face is open relative to the path. Starts left, curves right. One of the most common amateur ball flights.",
+      "causes": [
+        {
+          "text": "Steep out-to-in path with a face that is closed to target but open to path.",
+          "signal": "divot points left, ball starts left."
+        },
+        {
+          "text": "Over-the-top transition from the top.",
+          "signal": "shoulders opening early, steep angle of attack."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Shallow the path so it works more right, while keeping face awareness so the ball does not simply become a pull.",
+          "kind": "feel",
+          "kind_reason": "starts with 'shallow', a cue for the swing itself"
+        },
+        {
+          "text": "Feel the trail elbow drop in front of the hip in transition.",
+          "kind": "feel",
+          "kind_reason": "starts with 'feel', a cue for the swing itself"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "F001 slice",
+          "commonly_confused_with": "F002 pull-slice, F003 push-slice",
+          "what_separates_them": "Check where it started: left means a pull-slice, right means a push-slice, straight means a slice."
+        },
+        {
+          "entry": "F004 hook",
+          "commonly_confused_with": "F005 pull, F002 pull-slice",
+          "what_separates_them": "Check the curve. A pull goes straight left with no curve, and a pull-slice curves back right."
+        }
+      ]
+    },
+    {
+      "id": "F003",
+      "name": "Push-slice",
+      "what_it_is": "Face open to target with path also right of target but face open relative to it. Starts right, curves further right. The biggest single-shot miss in golf by total offline distance.",
+      "causes": [
+        {
+          "text": "In-to-out path with the face badly open to it.",
+          "signal": "divot points right, ball starts right."
+        },
+        {
+          "text": "Very late or absent face rotation.",
+          "signal": "hands ahead but face lagging open."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Rotate the face closed earlier through impact.",
+          "kind": "feel",
+          "kind_reason": "starts with 'rotate', a cue for the swing itself"
+        },
+        {
+          "text": "Check grip strength first, since this pattern usually has a weak grip underneath it.",
+          "kind": "structural",
+          "kind_reason": "matches generate.py's structural grip rule: grip strength or how the hands sit on the grip"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "F001 slice",
+          "commonly_confused_with": "F002 pull-slice, F003 push-slice",
+          "what_separates_them": "Check where it started: left means a pull-slice, right means a push-slice, straight means a slice."
+        }
+      ]
+    },
+    {
+      "id": "F004",
+      "name": "Hook",
+      "what_it_is": "Face closed to path, producing left curvature.",
+      "causes": [
+        {
+          "text": "In-to-out path with face closed to that path.",
+          "signal": "ball starts right then curves left."
+        },
+        {
+          "text": "Over-active hands through impact.",
+          "signal": "inconsistent, often alternates with blocks."
+        },
+        {
+          "text": "Toe strike via gear effect.",
+          "signal": "face marking toward the toe, curve appears even on a decent-feeling swing."
+        },
+        {
+          "text": "Grip too strong.",
+          "signal": "face closes without any hand action."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Weaken the grip slightly.",
+          "kind": "structural",
+          "kind_reason": "matches generate.py's structural grip rule: grip strength or how the hands sit on the grip"
+        },
+        {
+          "text": "Feel the chest continuing to rotate through impact rather than the hands taking over.",
+          "kind": "feel",
+          "kind_reason": "starts with 'feel', a cue for the swing itself"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "F004 hook",
+          "commonly_confused_with": "F005 pull, F002 pull-slice",
+          "what_separates_them": "Check the curve. A pull goes straight left with no curve, and a pull-slice curves back right."
+        },
+        {
+          "entry": "F004 hook",
+          "commonly_confused_with": "L002 ball above feet",
+          "what_separates_them": "If it only happens with the ball above your feet, the lie is the cause."
+        }
+      ]
+    },
+    {
+      "id": "F005",
+      "name": "Pull",
+      "what_it_is": "Face and path both left of target and matched to each other, so the ball starts left and stays left.",
+      "causes": [
+        {
+          "text": "Out-to-in path with the face square to that path.",
+          "signal": "no curvature, purely directional."
+        },
+        {
+          "text": "Aim and alignment left without the player realising.",
+          "signal": "consistent, repeatable, feels like a good strike."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Check alignment before touching the swing. This one is disproportionately an aim problem.",
+          "kind": "setup",
+          "kind_reason": "starts with 'check', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "If alignment is good, work the path more right while keeping the face matched.",
+          "kind": "feel",
+          "kind_reason": "a path change for the swing, once alignment has been checked"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "F004 hook",
+          "commonly_confused_with": "F005 pull, F002 pull-slice",
+          "what_separates_them": "Check the curve. A pull goes straight left with no curve, and a pull-slice curves back right."
+        }
+      ]
+    },
+    {
+      "id": "F006",
+      "name": "Push / block",
+      "what_it_is": "Face and path both right of target and matched. Starts right, no curve.",
+      "causes": [
+        {
+          "text": "In-to-out path with face square to it.",
+          "signal": "no curvature, straight right."
+        },
+        {
+          "text": "Hanging back on the trail side so the low point moves back and the path swings right.",
+          "signal": "often paired with thin or fat contact."
+        },
+        {
+          "text": "Alignment right of target.",
+          "signal": "repeatable and feels solid."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Check alignment first.",
+          "kind": "setup",
+          "kind_reason": "starts with 'check', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "Feel pressure moving into the lead side through transition.",
+          "kind": "feel",
+          "kind_reason": "starts with 'feel', a cue for the swing itself"
+        }
+      ],
+      "notes": [],
+      "differentials": []
+    },
+    {
+      "id": "F007",
+      "name": "Fat / heavy / chunk",
+      "what_it_is": "Low point behind the ball, so the club contacts ground first and loses energy.",
+      "causes": [
+        {
+          "text": "Weight hanging back on the trail side.",
+          "signal": "divot starts well behind the ball, finish balance poor."
+        },
+        {
+          "text": "Early release or casting from the top.",
+          "signal": "divot shallow and long, high ball flight, distance loss."
+        },
+        {
+          "text": "Added spine tilt away from target in the downswing.",
+          "signal": "pattern worsens with longer clubs."
+        },
+        {
+          "text": "Body rotation stalling so the arms release early.",
+          "signal": "strong shots alternate with fat ones."
+        },
+        {
+          "text": "Poor arc height control, independent of low point position.",
+          "signal": "fat shots occur even when weight and low point look correct."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Feel pressure into the lead foot before the club reaches the ball.",
+          "kind": "feel",
+          "kind_reason": "starts with 'feel', a cue for the swing itself"
+        },
+        {
+          "text": "Feel the hands ahead of the clubhead at impact.",
+          "kind": "feel",
+          "kind_reason": "starts with 'feel', a cue for the swing itself"
+        },
+        {
+          "text": "Check ball position, since too far forward creates fat contact even with a good low point.",
+          "kind": "setup",
+          "kind_reason": "starts with 'check', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "F007 fat",
+          "commonly_confused_with": "F015 chunked chip",
+          "what_separates_them": "A fat full swing and a chunked chip share a cause, but the fixes differ."
+        },
+        {
+          "entry": "F008 thin, F007 fat",
+          "commonly_confused_with": "L004 downhill lie",
+          "what_separates_them": "On a downhill lie, thin and fat contact are common, so do not blame your swing."
+        }
+      ]
+    },
+    {
+      "id": "F008",
+      "name": "Thin / skulled",
+      "what_it_is": "Contact at or above the ball's equator, producing a low, fast, low-spin shot.",
+      "causes": [
+        {
+          "text": "Instinctive lift to avoid an expected fat shot.",
+          "signal": "follows a fat shot in the same round or same session."
+        },
+        {
+          "text": "Early extension raising the hands through impact.",
+          "signal": "paired with heel strikes."
+        },
+        {
+          "text": "Loss of posture or standing up through the shot.",
+          "signal": "more common under pressure or with awkward lies."
+        },
+        {
+          "text": "Trying to help or scoop the ball into the air.",
+          "signal": "most common with wedges and short irons."
+        },
+        {
+          "text": "Hanging back so the club is on its way up at contact.",
+          "signal": "shared cause with F007."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Feel the clubhead brushing the ground after the ball rather than at it.",
+          "kind": "feel",
+          "kind_reason": "starts with 'feel', a cue for the swing itself"
+        },
+        {
+          "text": "Keep chest covering the ball through impact.",
+          "kind": "feel",
+          "kind_reason": "starts with 'keep', a cue for the swing itself"
+        },
+        {
+          "text": "Trust the loft to do the lifting rather than helping it.",
+          "kind": "feel",
+          "kind_reason": "starts with 'trust', a cue for the swing itself"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "F008 thin",
+          "commonly_confused_with": "F009 top",
+          "what_separates_them": "A thin shot still gets airborne. A topped shot does not."
+        },
+        {
+          "entry": "F008 thin, F007 fat",
+          "commonly_confused_with": "L004 downhill lie",
+          "what_separates_them": "On a downhill lie, thin and fat contact are common, so do not blame your swing."
+        }
+      ]
+    },
+    {
+      "id": "F009",
+      "name": "Top",
+      "what_it_is": "Extreme version of thin. Club contacts the upper hemisphere of the ball, producing a ground-bound shot.",
+      "causes": [
+        {
+          "text": "Same cluster as F008, in more severe form: lifting, early extension, loss of posture, weight hanging back.",
+          "signal": null
+        },
+        {
+          "text": "Ball position too far back with a lofted club, causing the leading edge to arrive high.",
+          "signal": "happens mainly with wedges."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Same as F008.",
+          "kind": "pointer",
+          "points_to": "F008",
+          "kind_reason": "not a fix on its own; use the fixes of F008"
+        },
+        {
+          "text": "With wedges and short irons, check that ball position has not crept back in the stance.",
+          "kind": "setup",
+          "kind_reason": "starts with 'with', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "With a driver, tee it so half the ball sits above the clubhead.",
+          "kind": "setup",
+          "kind_reason": "starts with 'with', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "With a driver or wood, sweep level through the ball rather than hitting down.",
+          "kind": "feel",
+          "kind_reason": "starts with the club it applies to, but the fix is a swing cue: sweep level through the ball"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "F008 thin",
+          "commonly_confused_with": "F009 top",
+          "what_separates_them": "A thin shot still gets airborne. A topped shot does not."
+        }
+      ]
+    },
+    {
+      "id": "F010",
+      "name": "Topped or thinned wedge",
+      "what_it_is": "Thin contact specifically with a high-lofted club. Worth separating from F008 because the causes skew differently and the consequences are worse, since a thinned wedge travels much further than intended.",
+      "causes": [
+        {
+          "text": "Trying to help the ball up with the most lofted club in the bag.",
+          "signal": "happens on short shots, not full swings."
+        },
+        {
+          "text": "Deceleration through impact.",
+          "signal": "short backswing, longer follow through, or the reverse."
+        },
+        {
+          "text": "Weight hanging back on a shot the player is anxious about.",
+          "signal": "worse over hazards or tight pins."
+        },
+        {
+          "text": "Ball position too far forward so the club is past low point.",
+          "signal": "consistent across attempts."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Keep pressure on the lead side throughout, since these shots do not need a weight shift.",
+          "kind": "feel",
+          "kind_reason": "starts with 'keep', a cue for the swing itself"
+        },
+        {
+          "text": "Accelerate through the ball rather than at it.",
+          "kind": "feel",
+          "kind_reason": "starts with 'accelerate', a cue for the swing itself"
+        },
+        {
+          "text": "Let the loft do the work and feel the leading edge staying low through the strike.",
+          "kind": "feel",
+          "kind_reason": "starts with 'let', a cue for the swing itself"
+        }
+      ],
+      "notes": [],
+      "differentials": []
+    },
+    {
+      "id": "F011",
+      "name": "Shank",
+      "what_it_is": "Ball strikes the hosel rather than the face, firing sharply right.",
+      "causes": [
+        {
+          "text": "Hands and hosel moving closer to the ball in space through impact.",
+          "signal": "the primary mechanical cause regardless of path direction."
+        },
+        {
+          "text": "Weight moving toward the toes in the downswing.",
+          "signal": "balance falling forward at finish."
+        },
+        {
+          "text": "Steep out-to-in path pushing the hosel out toward the ball.",
+          "signal": "divot points left."
+        },
+        {
+          "text": "Excessively inside takeaway forcing a loop back out.",
+          "signal": "divot points right."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Feel weight in the heels through impact.",
+          "kind": "feel",
+          "kind_reason": "starts with 'feel', a cue for the swing itself"
+        },
+        {
+          "text": "Feel the strike toward the toe side of the face.",
+          "kind": "feel",
+          "kind_reason": "starts with 'feel', a cue for the swing itself"
+        },
+        {
+          "text": "Address the ball slightly toward the toe as a temporary calibration.",
+          "kind": "setup",
+          "kind_reason": "starts with 'address', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "F011 shank",
+          "commonly_confused_with": "F013 heel strike",
+          "what_separates_them": "A shank comes off the hosel and shoots right. A heel strike stays on the face and fades."
+        }
+      ]
+    },
+    {
+      "id": "F012",
+      "name": "Skied drive",
+      "what_it_is": "Steep negative attack angle with the driver, contacting the ball high on the face or crown.",
+      "causes": [
+        {
+          "text": "Excessively steep attack angle with a club that needs a shallow or upward one.",
+          "signal": "crown marks, very high launch, distance loss."
+        },
+        {
+          "text": "Ball teed too low for the strike pattern.",
+          "signal": "easy to test and rule out first."
+        },
+        {
+          "text": "Weight moving toward the target too aggressively with the driver.",
+          "signal": "divot after a driver shot from a tee."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Tee the ball higher.",
+          "kind": "setup",
+          "kind_reason": "starts with 'tee', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "Feel the clubhead travelling level or slightly up as it meets the ball.",
+          "kind": "feel",
+          "kind_reason": "starts with 'feel', a cue for the swing itself"
+        },
+        {
+          "text": "Feel the trail shoulder staying below the lead shoulder through impact.",
+          "kind": "feel",
+          "kind_reason": "starts with 'feel', a cue for the swing itself"
+        }
+      ],
+      "notes": [],
+      "differentials": []
+    },
+    {
+      "id": "F013",
+      "name": "Heel strike",
+      "what_it_is": "Contact toward the heel of the face. Reduces ball speed and, on a driver, adds fade or slice spin through gear effect.",
+      "causes": [
+        {
+          "text": "Hands moving closer to the ball through impact, often with early extension.",
+          "signal": "paired with thin contact."
+        },
+        {
+          "text": "Standing too close at address.",
+          "signal": "consistent, present from the first swing."
+        },
+        {
+          "text": "Out-to-in path bringing the heel through first.",
+          "signal": "divot points left."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Feel weight in the heels and the strike toward the toe.",
+          "kind": "feel",
+          "kind_reason": "starts with 'feel', a cue for the swing itself"
+        },
+        {
+          "text": "Check setup distance from the ball before changing anything dynamic.",
+          "kind": "setup",
+          "kind_reason": "starts with 'check', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "F011 shank",
+          "commonly_confused_with": "F013 heel strike",
+          "what_separates_them": "A shank comes off the hosel and shoots right. A heel strike stays on the face and fades."
+        }
+      ]
+    },
+    {
+      "id": "F014",
+      "name": "Toe strike",
+      "what_it_is": "Contact toward the toe of the face. Reduces ball speed and, on a driver, adds draw or hook spin through gear effect.",
+      "causes": [
+        {
+          "text": "Standing too far from the ball.",
+          "signal": "consistent from the first swing."
+        },
+        {
+          "text": "Early extension or pulling the hands in through impact.",
+          "signal": "variable, worse under pressure."
+        },
+        {
+          "text": "Excessively in-to-out path.",
+          "signal": "divot points right."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Check setup distance first.",
+          "kind": "setup",
+          "kind_reason": "starts with 'check', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "Feel the chest rotating through rather than the arms pulling in.",
+          "kind": "feel",
+          "kind_reason": "starts with 'feel', a cue for the swing itself"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "F017 weak high flight",
+          "commonly_confused_with": "F014 toe strike",
+          "what_separates_them": "Check the face marking before assuming a swing fault."
+        }
+      ]
+    },
+    {
+      "id": "F015",
+      "name": "Chunked chip",
+      "what_it_is": "Ground contact before the ball on a short shot around the green.",
+      "causes": [
+        {
+          "text": "Weight on the trail foot at address or shifting back during the stroke.",
+          "signal": "the single most common cause on short shots."
+        },
+        {
+          "text": "Trying to lift the ball rather than striking down on it.",
+          "signal": "scooping motion, hands behind the clubhead at impact."
+        },
+        {
+          "text": "Deceleration through the ball.",
+          "signal": "backswing longer than follow through."
+        },
+        {
+          "text": "Wrist hinge released early.",
+          "signal": "club bottoming out before the ball."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Set up with weight favouring the lead side and keep it there.",
+          "kind": "setup",
+          "kind_reason": "starts with 'set', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "Feel the handle leading the clubhead through impact.",
+          "kind": "feel",
+          "kind_reason": "starts with 'feel', a cue for the swing itself"
+        },
+        {
+          "text": "Keep the through-swing at least as long as the backswing.",
+          "kind": "feel",
+          "kind_reason": "starts with 'keep', a cue for the swing itself"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "F007 fat",
+          "commonly_confused_with": "F015 chunked chip",
+          "what_separates_them": "A fat full swing and a chunked chip share a cause, but the fixes differ."
+        },
+        {
+          "entry": "F015 chunked chip",
+          "commonly_confused_with": "D001 decelerated",
+          "what_separates_them": "Did the club hit the ground first, or was the strike clean but gutless?"
+        }
+      ]
+    },
+    {
+      "id": "F016",
+      "name": "Bladed chip",
+      "what_it_is": "Thin contact on a short shot, sending the ball far past target.",
+      "causes": [
+        {
+          "text": "Reaction to a previous chunk, lifting through impact.",
+          "signal": "follows F015 closely in time."
+        },
+        {
+          "text": "Trying to help the ball into the air.",
+          "signal": "hands behind the ball at impact."
+        },
+        {
+          "text": "Ball position too far forward.",
+          "signal": "consistent across attempts."
+        },
+        {
+          "text": "Standing up out of posture through the stroke.",
+          "signal": "worse under pressure."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Keep chest over the ball through the stroke.",
+          "kind": "feel",
+          "kind_reason": "starts with 'keep', a cue for the swing itself"
+        },
+        {
+          "text": "Feel the club brushing the turf after the ball.",
+          "kind": "feel",
+          "kind_reason": "starts with 'feel', a cue for the swing itself"
+        },
+        {
+          "text": "Trust the loft.",
+          "kind": "feel",
+          "kind_reason": "starts with 'trust', a cue for the swing itself"
+        }
+      ],
+      "notes": [],
+      "differentials": []
+    },
+    {
+      "id": "F017",
+      "name": "Weak high flight / distance loss",
+      "what_it_is": "Excessive spin loft producing high launch, high spin and poor energy transfer. The ball climbs and falls short.",
+      "causes": [
+        {
+          "text": "Too much dynamic loft at impact, often from early release.",
+          "signal": "high flight, shallow divot, distance well below normal for the club."
+        },
+        {
+          "text": "Off-centre strike reducing smash factor.",
+          "signal": "check face marking before anything else."
+        },
+        {
+          "text": "Attack angle too steep relative to dynamic loft.",
+          "signal": "deep divot with high flight."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Feel the hands ahead of the clubhead at impact to reduce dynamic loft.",
+          "kind": "feel",
+          "kind_reason": "starts with 'feel', a cue for the swing itself"
+        },
+        {
+          "text": "Check strike location first, since a centre-face miss explains most single-shot distance loss.",
+          "kind": "setup",
+          "kind_reason": "starts with 'check', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "F017 weak high flight",
+          "commonly_confused_with": "F014 toe strike",
+          "what_separates_them": "Check the face marking before assuming a swing fault."
+        },
+        {
+          "entry": "D003 wrong club short",
+          "commonly_confused_with": "C001 cold, F017 distance loss",
+          "what_separates_them": "Cold air or a weak strike can look like the wrong club. Rule those out first."
+        }
+      ]
+    },
+    {
+      "id": "F018",
+      "name": "Two-way miss",
+      "what_it_is": "Alternating left and right misses within a round, usually a single underlying fault plus a compensation rather than two separate faults.",
+      "causes": [
+        {
+          "text": "In-to-out path with variable face rotation, producing hooks when the hands are active and blocks when they are not.",
+          "signal": "misses cluster as F004 and F006."
+        },
+        {
+          "text": "Steep out-to-in path with variable face, producing pulls and pull-slices.",
+          "signal": "misses cluster as F002 and F005."
+        },
+        {
+          "text": "A recent swing change not yet calibrated.",
+          "signal": "appeared shortly after working on something new."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Diagnose the path first, then the face. Chasing each individual miss will make it worse.",
+          "kind": "structural",
+          "kind_reason": "a way to work on the miss over many shots, not a next-shot fix"
+        },
+        {
+          "text": "Accept one miss direction temporarily so the pattern becomes readable.",
+          "kind": "structural",
+          "kind_reason": "accepting one miss for a while is a lasting plan, not a next-shot fix"
+        }
+      ],
+      "notes": [],
+      "differentials": []
+    },
+    {
+      "id": "L001",
+      "name": "Ball below feet",
+      "what_it_is": "A lie that promotes a fade or slice for every golfer, regardless of swing. With lofted clubs, much of the effect comes from the slope tilting the clubface so its loft points right of the target. That effect grows with loft, so it is large with wedges and short irons and small with a driver or fairway wood. With long clubs the curve comes mainly from the bent-over posture, which makes a full turn through the ball harder and can leave the face open.",
+      "causes": [],
+      "fixes": [
+        {
+          "text": "Aim left to allow for the curve.",
+          "kind": "setup",
+          "kind_reason": "starts with 'aim', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "Flex your knees more at address to get down to the ball.",
+          "kind": "setup",
+          "kind_reason": "starts with 'flex', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "Hold the club near the end of the grip, since the ball is further from you.",
+          "kind": "setup",
+          "kind_reason": "starts with 'hold', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "Take one more club, as the lie costs distance.",
+          "kind": "setup",
+          "kind_reason": "starts with 'take', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "Stay at the same height through the ball rather than rising up. Standing up is the common error and causes thin and topped shots.",
+          "kind": "feel",
+          "kind_reason": "starts with 'stay', a cue for the swing itself"
+        }
+      ],
+      "notes": [
+        {
+          "label": "Why it matters",
+          "text": "The resulting right-curving shot is usually a lie effect, not a swing fault. Diagnosing it as a slice will send you fixing something that is not broken."
+        }
+      ],
+      "differentials": [
+        {
+          "entry": "F001 slice",
+          "commonly_confused_with": "L001 ball below feet",
+          "what_separates_them": "If it only happens with the ball below your feet, the lie is the cause."
+        }
+      ]
+    },
+    {
+      "id": "L002",
+      "name": "Ball above feet",
+      "what_it_is": "A lie that promotes a draw or hook, because the club sits more closed relative to the swing.",
+      "causes": [],
+      "fixes": [
+        {
+          "text": "Aim right to allow for the curve.",
+          "kind": "setup",
+          "kind_reason": "starts with 'aim', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "Grip down on the club.",
+          "kind": "setup",
+          "kind_reason": "starts with 'grip', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "Expect less distance and club accordingly.",
+          "kind": "setup",
+          "kind_reason": "starts with 'expect', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "F004 hook",
+          "commonly_confused_with": "L002 ball above feet",
+          "what_separates_them": "If it only happens with the ball above your feet, the lie is the cause."
+        }
+      ]
+    },
+    {
+      "id": "L003",
+      "name": "Uphill lie",
+      "what_it_is": "The slope adds effective loft, producing higher launch and less distance.",
+      "causes": [],
+      "fixes": [
+        {
+          "text": "Take more club.",
+          "kind": "setup",
+          "kind_reason": "starts with 'take', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "Set your shoulders parallel to the slope.",
+          "kind": "setup",
+          "kind_reason": "starts with 'set', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "Expect a slight draw tendency.",
+          "kind": "setup",
+          "kind_reason": "starts with 'expect', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        }
+      ],
+      "notes": [],
+      "differentials": []
+    },
+    {
+      "id": "L004",
+      "name": "Downhill lie",
+      "what_it_is": "The slope reduces effective loft, producing lower launch and more run. Also the hardest lie to make clean contact from. The ground behind the ball is higher than the ball, so the club tends to catch the slope first unless the swing follows the slope down, and trying to lift the ball to avoid that causes thin contact.",
+      "causes": [],
+      "fixes": [
+        {
+          "text": "Take less club and expect run.",
+          "kind": "setup",
+          "kind_reason": "starts with 'take', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "Set shoulders with the slope and chase the club down it.",
+          "kind": "setup",
+          "kind_reason": "setting the shoulders with the slope is done at address; the line also carries a swing cue, chase the club down the slope"
+        },
+        {
+          "text": "Expect a fade tendency.",
+          "kind": "setup",
+          "kind_reason": "starts with 'expect', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "F008 thin, F007 fat",
+          "commonly_confused_with": "L004 downhill lie",
+          "what_separates_them": "On a downhill lie, thin and fat contact are common, so do not blame your swing."
+        }
+      ]
+    },
+    {
+      "id": "L005",
+      "name": "Heavy rough",
+      "what_it_is": "Grass between club and ball reduces control, closes the face through resistance, and cuts distance unpredictably.",
+      "causes": [],
+      "fixes": [
+        {
+          "text": "Take more loft and prioritise getting back to the fairway.",
+          "kind": "setup",
+          "kind_reason": "starts with 'take', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "Grip more firmly and expect the face to close.",
+          "kind": "setup",
+          "kind_reason": "starts with 'grip', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "Steepen the angle of attack to reduce grass interference.",
+          "kind": "feel",
+          "kind_reason": "starts with 'steepen', a cue for the swing itself"
+        }
+      ],
+      "notes": [],
+      "differentials": []
+    },
+    {
+      "id": "L006",
+      "name": "Flyer lie",
+      "what_it_is": "Light rough gets between club and ball, reducing spin and causing the ball to fly further than expected with less stopping power.",
+      "causes": [],
+      "fixes": [
+        {
+          "text": "Club down and expect run.",
+          "kind": "setup",
+          "kind_reason": "starts with 'club', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "Do not aim at a pin you cannot afford to fly.",
+          "kind": "setup",
+          "kind_reason": "starts with 'do', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "D004 wrong club long",
+          "commonly_confused_with": "L006 flyer lie",
+          "what_separates_them": "If it came from light rough, a flyer lie may have added the distance, not the club."
+        }
+      ]
+    },
+    {
+      "id": "D001",
+      "name": "Decelerated short shot",
+      "what_it_is": "Loss of speed through impact on a short shot, producing a heavily under-distanced result.",
+      "causes": [
+        {
+          "text": "Uncertainty about the shot or club.",
+          "signal": "log the commitment field, it will usually say unsure."
+        },
+        {
+          "text": "Backswing too long for the shot, requiring deceleration to control distance.",
+          "signal": "consistent across attempts."
+        },
+        {
+          "text": "Fear of over-hitting, often with a hazard behind the pin.",
+          "signal": "hazard field will show it."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Shorten the backswing so you can accelerate through.",
+          "kind": "feel",
+          "kind_reason": "starts with 'shorten', a cue for the swing itself"
+        },
+        {
+          "text": "Pick a landing spot rather than thinking about the hole.",
+          "kind": "setup",
+          "kind_reason": "starts with 'pick', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "F015 chunked chip",
+          "commonly_confused_with": "D001 decelerated",
+          "what_separates_them": "Did the club hit the ground first, or was the strike clean but gutless?"
+        }
+      ]
+    },
+    {
+      "id": "D002",
+      "name": "Over-hit short shot",
+      "what_it_is": "Excess distance on a short shot, usually from too little loft or too much speed for the shot.",
+      "causes": [
+        {
+          "text": "Club too low-lofted for the amount of carry needed.",
+          "signal": "bump and run with a mid-iron running out."
+        },
+        {
+          "text": "Too much speed applied to compensate for a perceived need to reach.",
+          "signal": null
+        },
+        {
+          "text": "Firm greens or firm run-off areas.",
+          "signal": "conditions field, and a pattern across the round."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Pick landing spot first, then choose the club that gets it there with normal pace.",
+          "kind": "setup",
+          "kind_reason": "starts with 'pick', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "On firm days, land it shorter and let it run.",
+          "kind": "setup",
+          "kind_reason": "starts with 'on', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        }
+      ],
+      "notes": [],
+      "differentials": []
+    },
+    {
+      "id": "D003",
+      "name": "Wrong club, came up short",
+      "what_it_is": "Contact was acceptable but the club could not cover the distance.",
+      "causes": [
+        {
+          "text": "Distance estimate based on best-case carry rather than average.",
+          "signal": "your logged average for that club will show it."
+        },
+        {
+          "text": "Conditions not accounted for, particularly cold air or into wind.",
+          "signal": "weather fields."
+        },
+        {
+          "text": "Elevation not accounted for on an uphill shot.",
+          "signal": null
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Club selection off your logged average carry, not your best.",
+          "kind": "setup",
+          "kind_reason": "starts with 'club', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "Add a club for cold or into wind rather than swinging harder.",
+          "kind": "setup",
+          "kind_reason": "starts with 'add', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "D003 wrong club short",
+          "commonly_confused_with": "C001 cold, F017 distance loss",
+          "what_separates_them": "Cold air or a weak strike can look like the wrong club. Rule those out first."
+        }
+      ]
+    },
+    {
+      "id": "D004",
+      "name": "Wrong club, went long",
+      "what_it_is": "Contact was acceptable but the club carried further than needed.",
+      "causes": [
+        {
+          "text": "Downwind or warm conditions increasing carry.",
+          "signal": "weather fields."
+        },
+        {
+          "text": "Downhill shot not accounted for.",
+          "signal": null
+        },
+        {
+          "text": "Adrenaline or a firmer strike than usual.",
+          "signal": "compare achieved distance against your average."
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Club off the actual number including elevation and wind.",
+          "kind": "setup",
+          "kind_reason": "starts with 'club', done before the swing: aim, ball position, stance, where the club is held, tee height, club choice or a check"
+        },
+        {
+          "text": "Take note of which conditions consistently add distance for you.",
+          "kind": "structural",
+          "kind_reason": "noting conditions over many rounds is a lasting habit, not a next-shot fix"
+        }
+      ],
+      "notes": [],
+      "differentials": [
+        {
+          "entry": "D004 wrong club long",
+          "commonly_confused_with": "L006 flyer lie",
+          "what_separates_them": "If it came from light rough, a flyer lie may have added the distance, not the club."
+        }
+      ]
+    },
+    {
+      "id": "D005",
+      "name": "Bunker shot left short",
+      "what_it_is": "Insufficient distance from a greenside bunker despite escaping.",
+      "causes": [
+        {
+          "text": "Entry point too far behind the ball, taking too much sand.",
+          "signal": "deep divot in the sand, distance well short."
+        },
+        {
+          "text": "Deceleration through the sand.",
+          "signal": "short follow through."
+        },
+        {
+          "text": "Sand heavier or wetter than expected.",
+          "signal": "conditions, and a pattern across the round."
+        },
+        {
+          "text": "Face not open enough, so the club digs rather than sliding.",
+          "signal": null
+        }
+      ],
+      "fixes": [
+        {
+          "text": "Enter the sand a consistent distance behind the ball and accelerate through.",
+          "kind": "feel",
+          "kind_reason": "starts with 'enter', a cue for the swing itself"
+        },
+        {
+          "text": "Commit to a full finish, since bunker shots need more speed than they feel like they should.",
+          "kind": "feel",
+          "kind_reason": "starts with 'commit', a cue for the swing itself"
+        }
+      ],
+      "notes": [],
+      "differentials": []
+    },
+    {
+      "id": "N001",
+      "name": "Good shot, nothing to diagnose",
+      "what_it_is": "A shot that did what you intended. Includes a deliberate shape that came off, since a fade you meant is not a miss.",
+      "causes": [],
+      "fixes": [],
+      "notes": [
+        {
+          "label": "Why it needs an entry",
+          "text": "Without one, a query describing a good shot returns the nearest fault, and the tool invents a problem that is not there. Diagnosing a good shot is worse than saying nothing, because it teaches you to change something that is working."
+        },
+        {
+          "label": "Correct response",
+          "text": "Log it and move on. No fix, no swing thought. If `intended_shape` was set and the shot matched it, that is worth recording as a success rather than a neutral event."
+        },
+        {
+          "label": "Watch for",
+          "text": "A good outcome from a bad decision is still a bad decision. If the shot came off but the strategy flag fired, log the decision quality separately. See S003 and R001."
+        }
+      ],
+      "differentials": []
+    }
+  ]
+}

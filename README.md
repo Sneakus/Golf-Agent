@@ -39,6 +39,8 @@ Query 13 never said where the ball started. The answer failed validation, so the
 
 The eval set is saturated on diagnosis: the last batch matched the labelled entry on all 59 answerable queries. Further improvement needs new queries that were not used to tune the system.
 
+On a held-out set of 51 game-style shot descriptions (Set G, `golf-game-queries.md`), retrieval found the right entry in the top seven for only 29. The near-perfect results above come from a test set that was used for tuning, so they overstate how well retrieval does on new wording. Every miss was a shot described by where it started and how it curved. Words like fairway, green and pin pulled in the wrong entries. Every strike fault, such as fat, thin or off the heel, was found. The paid generation run on Set G was deliberately not done: the range game reads the knowledge base directly, so it does not need Golf Agent's answers.
+
 The seven-entry pass was chosen by sweeping this same eval set. The gain is measured on the queries used to choose it. Passing more candidates is a structural change rather than a tuned knob, which limits the overfitting risk, but it does not remove it.
 
 Plain wording is checked after the answer is written, so about a third of answers need an extra rewrite. Moving that plain-word list into the main prompt is the next step.
@@ -110,6 +112,13 @@ python compare_strategies.py --corpus golf-fault-corpus-v3.md golf-out-of-scope-
 python hybrid_eval.py --corpus golf-fault-corpus-v3.md golf-out-of-scope-entries.md \
                       --evals golf-eval-sets-v2.md
 
+# retrieval eval on the held-out range-game set
+python evaluate.py --corpus golf-fault-corpus-v3.md golf-out-of-scope-entries.md \n                   --evals golf-game-queries.md --k 7
+
+# export the knowledge base for the range game, then test it (no API calls)
+python export_knowledge_base.py
+python test_export_knowledge_base.py
+
 # derive the refusal threshold from the data
 python tune_threshold.py --corpus golf-fault-corpus-v3.md golf-out-of-scope-entries.md \
                          --evals golf-eval-sets-v2.md
@@ -159,6 +168,10 @@ Workflow export: [`n8n-workflow.json`](n8n-workflow.json). Full specification: [
 | `golf-fault-corpus-v3.md` | 45 fault entries across swing, putting, distance, lie, strategy, conditions, recovery |
 | `golf-out-of-scope-entries.md` | 8 out-of-scope entries and 1 no-fault entry |
 | `golf-eval-sets-v2.md` | Eval sets, dated results log, and the reasoning behind each change |
+| `golf-game-queries.md` | Set G, 51 held-out range-game shot descriptions, used as a retrieval test |
+| `export_knowledge_base.py` | Writes `exports/golf-knowledge-base.json` for the range game. No API calls |
+| `exports/golf-knowledge-base.json` | Corpus entries for the range game, copied word for word, with fixes tagged by kind |
+| `test_export_knowledge_base.py` | Runs the export and checks every listed entry is present with a fix |
 | `evaluate.py` | Canonical eval. Full metric set, bootstrap CIs, latency, cost, CI gate |
 | `generate.py` | Generation layer with schema-constrained output and enforced refusal |
 | `eval_harness.py` | Corpus and eval parsing, embedding |
