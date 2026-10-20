@@ -2,7 +2,7 @@
 
 Queries for the golf range game on jonesai.dev. The game names every shot from a 15-name grid (start direction by curve) plus strike faults, and it knows the true cause of every shot it simulates. Each query here describes one of those shots in a golfer's voice, so every query has a known correct answer.
 
-The answers generated from this set become the game's coaching library (see `export_coach_library.py`). The game never calls an AI service, so these answers are generated once, in advance.
+Set G is a held-out retrieval test. It was not used to tune the system. No answers are generated from it for the game, and the game does not use Golf Agent's answers. The game reads the knowledge base directly (see `export_knowledge_base.py`), because it already knows the true cause of every shot.
 
 Draw, fade, straight and air shot are left out. The game handles those with its own text.
 
